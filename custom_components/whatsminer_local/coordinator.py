@@ -13,8 +13,7 @@ from homeassistant.util import dt as dt_util
 from .api import WhatsminerClient, WhatsminerError, flatten
 from .chip_web import ChipWebClient, ChipWebError
 from .const import (
-    CONF_PERCENT_MODE, CONF_WEB_AUTH, CONF_WEB_CHIPS, CONF_WEB_COOKIE, CONF_WEB_PASSWORD,
-    CONF_WEB_PATH, CONF_WEB_POINTER, CONF_WEB_PORT, CONF_WEB_PROTOCOL, CONF_WEB_USERNAME,
+    CONF_PERCENT_MODE, CONF_WEB_CHIPS, CONF_WEB_PASSWORD, CONF_WEB_USERNAME,
     CONF_WEB_VERIFY_SSL, DEFAULT_WEB_PATH, DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT,
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN,
 )
@@ -38,11 +37,9 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
             self.web_client = ChipWebClient(
                 async_create_clientsession(hass, cookie_jar=aiohttp.CookieJar(unsafe=True)),
                 self.config[CONF_HOST],
-                self.config.get(CONF_WEB_PROTOCOL, DEFAULT_WEB_PROTOCOL),
-                self.config.get(CONF_WEB_PORT, DEFAULT_WEB_PORT),
-                self.config.get(CONF_WEB_PATH, DEFAULT_WEB_PATH), self.config.get(CONF_WEB_POINTER, ""),
-                self.config.get(CONF_WEB_AUTH, "none"), self.config.get(CONF_WEB_USERNAME, ""),
-                self.config.get(CONF_WEB_PASSWORD, ""), self.config.get(CONF_WEB_COOKIE, ""),
+                DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT, DEFAULT_WEB_PATH,
+                auth_type="luci", username=self.config.get(CONF_WEB_USERNAME, "admin"),
+                password=self.config.get(CONF_WEB_PASSWORD, ""),
                 verify_ssl=self.config.get(CONF_WEB_VERIFY_SSL, True), detach_session=True)
         super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(
             seconds=self.config.get(CONF_SCAN_INTERVAL, DEFAULT_INTERVAL)))

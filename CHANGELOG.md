@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Simplify web setup to username, password and HTTPS certificate verification. Use HTTPS:443, the built-in btminerapi path and LuCI login automatically.
+- Remove web protocol/port/path/authentication/JSON Pointer/cookie fields and the API port field from forms. New API connections use TCP 4433; existing custom API ports are preserved internally.
+- Migrate existing entries to the fixed web profile while retaining separate API/web credentials, explicit TLS settings and entity identity. No device writes are issued during migration or reload.
+- Explain that super and web admin are separate accounts with independently managed passwords, including the password-related rejection hint. Do not guess passwords, change token generation or retry writes automatically.
+- Pass 63 automated tests (52 Python, 11 JavaScript), including simplified forms and configuration migration regressions.
+
 ## 0.4.0
 
 - Preserve per-chip raw frequency/voltage, nonce/errors/CRC/repeat and both x/pct values from the existing LuCI request or normalized JSON.

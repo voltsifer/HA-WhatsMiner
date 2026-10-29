@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.4.0**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.0**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -17,7 +17,7 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - `set.miner.power_percent` control and a local `normal` / `fast` adjustment-mode selector.
 - Chip frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values in map attributes and chip details.
 - Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
-- Optional LuCI session login and renewal, HTTP Basic authentication or an existing session cookie.
+- Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials and certificate verification are configured.
 - A heatmap card with chip IDs, temperatures, statistics, median deviations and explicit board layouts.
 - One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
 - Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
@@ -30,7 +30,7 @@ Repository: **https://github.com/voltsifer/HA-WhatsMiner**.
 2. Add `https://github.com/voltsifer/HA-WhatsMiner`, category **Integration**.
 3. Download **HA-WhatsMiner** and restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration → HA-WhatsMiner**.
-5. Enter the miner host, API port **4433** and polling interval, normally **30 seconds**.
+5. Enter the miner host and polling interval, normally **30 seconds**. API TCP port **4433** is automatic.
 
 Start with power control and web chip data disabled, then compare API telemetry with the miner's interface. HACS installs the heatmap JavaScript with the integration; a second dashboard repository is unnecessary. See [HEATMAP.md](HEATMAP.md) for resource registration.
 
@@ -44,12 +44,12 @@ Existing entity IDs and user-customized names are maintained by Home Assistant. 
 
 Open **Settings → Devices & services → HA-WhatsMiner → Configure** (the options/gear control on the existing integration entry). Do not add a duplicate miner to change credentials.
 
-**The first screen is only Connection settings. Select Submit to continue; it does not finish the options flow when power control or web data is enabled.** Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password or cookie field preserves its previous value.
+**The first screen is only Connection settings. Select Submit to continue; it does not finish the options flow when power control or web data is enabled.** Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password field preserves its previous value.
 
 - The **API password** and account are used for TCP power commands.
-- The **Web username/password** and **Web authentication** are used for chip data. Select **luci** for the supplied LuCI login page; Basic is a different HTTP authentication scheme.
-- Updating stored connection credentials does not change the account password on the miner itself. Device account passwords are managed on the miner or through WhatsminerTool.
-- When the host and API port remain unchanged, option changes can be saved while the miner is unreachable. A changed host or port is still checked to avoid accidentally attaching an existing entry to another miner.
+- The **Web username/password** are used for LuCI chip data; HTTPS, port 443, the page path and LuCI login are automatic. Only web credentials and certificate verification are shown in the web form.
+- Updating stored connection credentials does not change the account password on the miner itself. Device account passwords are managed through WhatsminerTool. The API account `super` has its own password: do not assume the web `admin` password matches it.
+- When the host remains unchanged, option changes can be saved while the miner is unreachable. A changed host is still checked to avoid accidentally attaching an existing entry to another miner.
 - Saving options reloads the integration without issuing power commands.
 
 ## Power control
@@ -89,24 +89,30 @@ data:
 
 ### Investigate a rejected power percentage command
 
-If the miner reports **invalid json or password is wrong**, first check the password for the selected **API account** in **Configure → submit Connection settings → Power control**. This firmware message is ambiguous; it does not prove that the password alone is wrong. The request object and SHA256/Base64 token follow the documented API 3.x format and are tested against a reference vector. Changing Basic/LuCI web authentication does not fix TCP authentication. API Write must also be enabled in WhatsminerTool. Setup deliberately does not validate credentials by sending a power command.
+#### Separate super and admin passwords
+
+A working web login as `admin` does not validate the password for API account `super`. In **WhatsminerTool → Password**, select the actual miner and account **super** to manage that account's password, then enter its current password in HA's API control form. Leave the web credentials set to the account that opens the LuCI page. The manufacturer's [operation guide, section 8](https://aws-microbt-com-bucket.s3.us-west-2.amazonaws.com/WhatsMinerTool%20Operating%20GuideV8.1.30.pdf) lists separate account selection when changing passwords and documents factory passwords as matching account names. For an unchanged factory `super` account this means `super`, not the web `admin` password; this is not a guarantee of the current password on a used or reconfigured device.
+
+The integration never tries alternative/default passwords or silently copies web credentials to the API account. It does not reset or change device passwords. Existing token generation and the explicit power request format are unchanged.
+
+If the miner reports **invalid json or password is wrong**, first check the password for the selected **API account** in **Configure → submit Connection settings → Power control**. This firmware message is ambiguous; it does not prove that the password alone is wrong. The request object and SHA256/Base64 token follow the documented API 3.x format and are tested against a reference vector. LuCI web login does not authenticate TCP power commands. API Write must also be enabled in WhatsminerTool. Setup deliberately does not validate credentials by sending a power command.
 
 API code **-1** is a generic miner failure, not a diagnosis. The integration sends the documented object `{percent, mode}` and does not automatically fall back to another mode or retry the write.
 
 The action error now includes the requested percentage/mode and a sanitized firmware explanation when one is returned. The percentage number entity exposes `last_command`, also included in downloaded diagnostics: requested value, adjustment mode, reported miner work mode, tuning flag, status and API failure code. It contains no configured credentials or authentication token.
 
-For `normal` adjustment, check that tuning has finished and that an air-cooled miner is in Normal/Low Power mode. `fast` is an explicitly selected alternative with different stability/performance behavior; it is never selected automatically after a failure. Check active miner protection errors and verify API Write/account permissions as appropriate. Web Basic/LuCI authentication does not control TCP API power-command authentication.
+For `normal` adjustment, check that tuning has finished and that an air-cooled miner is in Normal/Low Power mode. `fast` is an explicitly selected alternative with different stability/performance behavior; it is never selected automatically after a failure. Check active miner protection errors and verify API Write/account permissions as appropriate. Web LuCI authentication does not control TCP API power-command authentication.
 
 ## Individual chip temperatures
 
-The default web profile uses:
+The built-in web profile uses these fixed settings (not editable form fields):
 
 ```text
 Protocol: https
 Port: 443
 Path: /cgi-bin/luci/admin/status/btminerapi
 Authentication: luci
-JSON Pointer: leave blank for HTML or text
+JSON Pointer: none
 ```
 
 The integration reads `C<n>` chip records inside `slot:` blocks from the page's `textarea#syslog`. It preserves the source IDs, including zero-based IDs such as `C0`; it does not rename them to `U1` or infer temperatures from board statistics.
@@ -114,6 +120,8 @@ The integration reads `C<n>` chip records inside `slot:` blocks from the page's 
 Each map chip also carries the available `frequency_raw`, `voltage_raw`, `nonce`, `errors`, `crc_errors`, `x`, `x_secondary`, `repeat`, `pct` and `pct_secondary` fields. The card shows them when selecting a chip. They are also attributes of individual chip temperature sensors, which remain disabled by default. Voltage and frequency scales/units are unverified for this log, so raw readings are not converted to volts or assigned MHz. The two x/pct values retain source order without assigning undocumented meanings. Counters are snapshots, not calculated rates.
 
 LuCI credentials are separate from API credentials. Certificate verification is enabled by default. For a trusted local miner with a self-signed certificate, you can explicitly disable **Verify HTTPS certificate** in the web options. This affects only that miner's web requests.
+
+Upgrade to 0.5.0 removes legacy endpoint, HTTP/Basic/Cookie, JSON Pointer and cookie options from saved entries. Web username/password and the certificate-verification choice are preserved. Old custom web endpoints are replaced by this fixed profile. Existing custom API ports are retained internally for compatibility; new connections use 4433.
 
 The supplied path is known, but the private device cannot be reached from this development environment. A supplied page response has been successfully parsed as three 172-chip boards. Live retrieval from this private device has not been verified. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
 

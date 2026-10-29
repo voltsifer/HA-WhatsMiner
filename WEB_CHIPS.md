@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.4.0** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
+Version **0.5.0** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
 
 ## Known endpoint
 
@@ -10,7 +10,9 @@ The supplied endpoint path is:
 https://MINER_IP/cgi-bin/luci/admin/status/btminerapi
 ```
 
-New web configuration forms prefill HTTPS, port 443 and `/cgi-bin/luci/admin/status/btminerapi`. The host is taken from the configured miner, rather than embedded in source. Existing explicitly configured protocol, port and path values are preserved.
+HTTPS, port 443, `/cgi-bin/luci/admin/status/btminerapi` and LuCI authentication are fixed by the integration. The host is taken from the configured miner. Web forms contain only username, password and Verify HTTPS certificate. Protocol, port, GET path, authentication method, JSON Pointer and a session cookie are not user settings.
+
+On upgrade, obsolete web keys are removed from both saved data and options. The current web credentials and explicit certificate choice are preserved; a legacy custom endpoint/authentication choice is replaced with the built-in profile. The migration does not send device configuration or power commands.
 
 This private device is not reachable from the development environment. The supplied HTML confirms the expected syslog format; network access and the authenticated session still have to be checked from Home Assistant.
 
@@ -58,21 +60,21 @@ The same request collects these optional numeric fields; no additional miner pol
 
 The firmware-specific meanings of x/pct, reference intervals and counter reset behavior are not inferred. Missing fields are omitted; invalid supplied values become null. Counter negatives/fractions and non-finite/boolean values are invalid. No totals, rates, fault classification or voltage conversions are synthesized. Unknown fields are discarded rather than exposing arbitrary log contents. A chip record can retain other measurements even when its temperature is missing.
 
-The parser accepts whitespace variations and HTML-escaped textarea content. A login page, missing/truncated syslog textarea or unsupported response does not produce false temperatures. Leave **JSON Pointer blank** for HTML or plain text.
+The parser accepts whitespace variations and HTML-escaped textarea content. A login page, missing/truncated syslog textarea or unsupported response does not produce false temperatures. HTML and plain text use the root response without a JSON Pointer.
 
 A public client using this same page and log format is documented [here](https://github.com/HashSource/whatsminer_chip_map/blob/master/src/api.rs). The Python adapter uses its own HTMLParser-based extraction and field validation; no third-party runtime code is bundled.
 
 ## Authentication and HTTPS
 
-Select **luci** to use web username/password credentials. The client first reads the data page. If authentication is required, it posts the credentials to the same miner's `/cgi-bin/luci`, then retries the data read once. It uses an isolated cookie jar per miner that accepts cookies for IP-address hosts. An expired session is renewed on the next read; a failed login is not repeatedly retried in a loop.
+LuCI login automatically uses the configured web username/password credentials (the username defaults to admin). The client first reads the data page. If authentication is required, it posts the credentials to the same miner's `/cgi-bin/luci`, then retries the data read once. It uses an isolated cookie jar per miner that accepts cookies for IP-address hosts. An expired session is renewed on the next read; a failed login is not repeatedly retried in a loop.
 
-Other supported choices are **none**, **basic** and **cookie**. The cookie option uses an explicitly supplied session cookie without automatic renewal. API and web passwords are separate. Blank secret fields in the options flow preserve existing values.
+HTTP Basic, manually supplied cookies, alternative paths/protocols and JSON Pointers are not exposed or used by the integration. Low-level parser/transport helpers retain compatibility for development tests. API and web passwords are separate. A blank web password in the options flow preserves the existing value; the API password is never reused automatically. The API super account password must not be assumed to equal the web admin account password.
 
 HTTPS certificate verification is **enabled by default**. If the trusted local miner uses a self-signed certificate, explicitly uncheck **Verify HTTPS certificate** in the web options. An HTTPS certificate failure is reported as `web_tls_error`; the integration never disables verification automatically. Ordinary redirects are not followed, and login credentials are sent only to the configured miner.
 
 Only data GET requests and the LuCI authentication POST are used. This web client does not send miner configuration or power commands. Digest, Bearer authentication, WebSocket data and arbitrary POST-based data endpoints are not implemented.
 
-## Normalized JSON
+## Parser JSON contract (development)
 
 The fallback JSON contract is an integration format; it is not claimed to be the firmware's native JSON schema:
 
@@ -90,7 +92,7 @@ The fallback JSON contract is an integration format; it is not claimed to be the
 }
 ```
 
-For a nested response, configure a JSON Pointer such as `/data` for `{"data":{"boards":[...]}}`. Optional zero-based integer `row` and `column` fields describe explicit positions, whose physical accuracy must be checked.
+The parser helper supports nested responses with a JSON Pointer for development, but custom JSON endpoints and pointers are not configuration features. Optional zero-based integer `row` and `column` fields describe explicit positions, whose physical accuracy must be checked.
 
 `tools/inspect_web_response.py response.json` summarizes a saved JSON schema without printing string values or authentication headers. It is a JSON inspection tool; use the saved HTML/text directly when inspecting LuCI.
 

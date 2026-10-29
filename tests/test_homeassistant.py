@@ -119,7 +119,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         flow = await self.hass.config_entries.flow.async_init(DOMAIN, context={'source': 'user'})
         self.assertEqual(flow['step_id'], 'user')
         flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
-            'host': '192.0.2.10', 'port': 4433, 'scan_interval': 30, 'enable_control': True})
+            'host': '192.0.2.10', 'scan_interval': 30, 'enable_control': True})
         self.assertEqual(flow['step_id'], 'control')
         flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
             'account': 'super', 'password': 'secret', 'min_power': 3500, 'max_power': 1500})
@@ -134,7 +134,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         options = await self.hass.config_entries.options.async_init(entry.entry_id)
         self.assertEqual(options['step_id'], 'init')
         options = await self.hass.config_entries.options.async_configure(options['flow_id'], {
-            'host': '192.0.2.10', 'port': 4433, 'scan_interval': 60, 'enable_control': True})
+            'host': '192.0.2.10', 'scan_interval': 60, 'enable_control': True})
         self.assertEqual(options['step_id'], 'control')
         options = await self.hass.config_entries.options.async_configure(options['flow_id'], {
             'account': 'super', 'min_power': 1600, 'max_power': 3400})
@@ -201,7 +201,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(shared.closed)
         self.assertFalse(shared.connector.closed)
 
-    async def test_existing_options_edit_password_and_web_auth_without_probe(self):
+    async def test_existing_options_edit_passwords_without_probe(self):
         from custom_components.whatsminer_local.api import WhatsminerError
         readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 92}]}]
         with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
@@ -214,7 +214,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             self.client.read_snapshot.side_effect = WhatsminerError('offline')
             flow = await self.hass.config_entries.options.async_init(entry.entry_id)
             flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
-                'host': '192.0.2.10', 'port': 4433, 'scan_interval': 30,
+                'host': '192.0.2.10', 'scan_interval': 30,
                 'enable_control': True, 'web_chips': True,
             })
             self.assertEqual(flow['step_id'], 'control')
@@ -226,15 +226,14 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             # The final save may reload the entry; restore the emulator for that reload.
             self.client.read_snapshot.side_effect = None
             flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
-                'web_protocol': 'https', 'web_port': 443,
-                'web_path': '/cgi-bin/luci/admin/status/btminerapi', 'web_json_pointer': '',
-                'web_auth': 'luci', 'web_username': 'new-user', 'web_password': 'new-web-password',
+                'web_username': 'new-user', 'web_password': 'new-web-password',
                 'web_verify_ssl': False,
             })
             self.assertEqual(flow['type'], 'create_entry')
             self.assertEqual(entry.options['password'], 'new-api-password')
             self.assertEqual(entry.options['web_password'], 'new-web-password')
-            self.assertEqual(entry.options['web_auth'], 'luci')
+            self.assertNotIn('web_auth', entry.options)
+            self.assertNotIn('web_cookie', entry.options)
             await self.hass.async_block_till_done()
             self.client.set_power.assert_not_awaited()
             self.client.set_power_percent.assert_not_awaited()
@@ -262,7 +261,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         before = self.client.read_snapshot.await_count
         flow = await self.hass.config_entries.options.async_init(entry.entry_id)
         flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
-            'host': '192.0.2.11', 'port': 4433, 'scan_interval': 30,
+            'host': '192.0.2.11', 'scan_interval': 30,
             'enable_control': False, 'web_chips': False,
         })
         self.assertEqual(flow['errors']['base'], 'cannot_connect')
@@ -321,3 +320,73 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             await self.hass.async_block_till_done()
             self.assertEqual(self.hass.states.get(board.entity_id).state, 'unavailable')
             self.assertEqual(self.hass.states.get(board.entity_id).attributes.get('chips', []), [])
+
+    async def test_simplified_forms_use_fixed_defaults_and_require_web_credentials(self):
+        from custom_components.whatsminer_local.config_flow import connection_schema, web_schema
+        self.assertNotIn('port', {str(key) for key in connection_schema({}).schema})
+        self.assertEqual({str(key) for key in web_schema({}).schema},
+                         {'web_username', 'web_password', 'web_verify_ssl'})
+        flow = await self.hass.config_entries.flow.async_init(DOMAIN, context={'source': 'user'})
+        flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
+            'host': '192.0.2.10', 'scan_interval': 30, 'enable_control': False, 'web_chips': True})
+        self.assertEqual(flow['step_id'], 'web')
+        self.assertNotIn('web_auth', {str(key) for key in flow['data_schema'].schema})
+        flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
+            'web_username': 'admin', 'web_verify_ssl': False})
+        self.assertEqual(flow['errors']['base'], 'web_credentials_required')
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 73}]}]
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
+            flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
+                'web_username': 'admin', 'web_password': 'web-only-secret', 'web_verify_ssl': False})
+            self.assertEqual(flow['type'], 'create_entry')
+            await self.hass.async_block_till_done()
+            coordinator = self.hass.data[DOMAIN][flow['result'].entry_id]
+            self.assertEqual(coordinator.client, self.client)
+            client = coordinator.web_client
+            self.assertEqual(str(client.url), 'https://192.0.2.10/cgi-bin/luci/admin/status/btminerapi')
+            self.assertEqual(client.auth_type, 'luci')
+            self.assertEqual(client.username, 'admin')
+            self.assertEqual(client.password, 'web-only-secret')
+            self.assertFalse(client.verify_ssl)
+            self.assertNotIn('password', flow['result'].data)
+            self.client.set_power.assert_not_awaited()
+            self.client.set_power_percent.assert_not_awaited()
+
+    async def test_upgrade_removes_legacy_web_settings_and_preserves_separate_credentials(self):
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 73}]}]
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
+            entry = await self.add_entry(control=True, extra={
+                'web_chips': True, 'web_protocol': 'http', 'web_port': 80,
+                'web_path': '/legacy', 'web_auth': 'basic', 'web_cookie': 'old-cookie',
+                'web_json_pointer': '/data', 'web_username': 'admin',
+                'web_password': 'different-web-password', 'web_verify_ssl': False,
+            })
+            self.assertEqual(entry.minor_version, 2)
+            for key in ('web_protocol', 'web_port', 'web_path', 'web_auth', 'web_cookie', 'web_json_pointer'):
+                self.assertNotIn(key, entry.data)
+                self.assertNotIn(key, entry.options)
+            self.assertEqual(entry.data['password'], 'secret')
+            self.assertEqual(entry.data['web_password'], 'different-web-password')
+            self.assertFalse(entry.data['web_verify_ssl'])
+            self.assertEqual(entry.data['port'], 4433)
+            client = self.hass.data[DOMAIN][entry.entry_id].web_client
+            self.assertEqual(client.url.scheme, 'https')
+            self.assertEqual(client.url.port, 443)
+            self.assertEqual(client.url.path, '/cgi-bin/luci/admin/status/btminerapi')
+            self.assertEqual(client.auth_type, 'luci')
+            self.client.set_power.assert_not_awaited()
+            self.client.set_power_percent.assert_not_awaited()
+
+    async def test_migration_cleans_options_without_overwriting_secrets_or_api_port(self):
+        from custom_components.whatsminer_local import async_migrate_entry
+        entry = await self.add_entry()
+        self.hass.config_entries.async_update_entry(entry, minor_version=1, options={
+            'web_protocol': 'http', 'web_port': 8080, 'web_auth': 'cookie',
+            'web_cookie': 'old-session', 'web_password': 'web-secret',
+            'password': 'api-secret', 'port': 4444,
+        })
+        self.assertTrue(await async_migrate_entry(self.hass, entry))
+        self.assertEqual(dict(entry.options), {'web_password': 'web-secret', 'password': 'api-secret', 'port': 4444})
+        self.assertTrue(await async_migrate_entry(self.hass, entry))
+        self.assertEqual(entry.minor_version, 2)
+        await self.hass.async_block_till_done()

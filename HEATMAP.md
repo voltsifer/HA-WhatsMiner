@@ -7,7 +7,7 @@ The card requires individual chip readings from the web adapter. API board minim
 The JavaScript is installed with the integration, including HACS installations. After installing and restarting Home Assistant:
 
 1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
-2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.4.0`**, type **JavaScript module**.
+2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.5.0`**, type **JavaScript module**.
 3. Reload the browser. Update the URL version parameter or clear the browser cache after upgrading the card.
 4. Add a manual card using the actual entity IDs of your **Board N web chip map** sensors:
 

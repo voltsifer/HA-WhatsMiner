@@ -4,10 +4,9 @@
     "step": {
       "user": {
         "title": "WhatsMiner API 3.x",
-        "description": "Direct local connection. Setup reads telemetry only. API 2.x on port 4028 is not supported. Select Submit to continue to API power control and web settings when enabled.",
+        "description": "Direct local connection. Setup reads telemetry only. API 2.x on port 4028 is not supported. Select Submit to continue to API power control and web settings when enabled. The API connection uses TCP port 4433 automatically.",
         "data": {
           "host": "Host",
-          "port": "TCP port",
           "scan_interval": "Polling interval (seconds)",
           "enable_control": "Enable power control",
           "web_chips": "Read individual chips from WEB (experimental)"
@@ -15,7 +14,7 @@
       },
       "control": {
         "title": "Power control",
-        "description": "Enter limits appropriate for your exact model. Enable API Write in WhatsminerTool. Use super or user1–user3. Setup does not test credentials with a write command. This is the password for the selected API account, separate from web login credentials.",
+        "description": "Enter limits appropriate for your exact model. Enable API Write in WhatsminerTool. Use super or user1–user3. Setup does not test credentials with a write command. This is the password for the selected API account, separate from web login credentials. The super account has its own password; do not assume the web admin password matches it. Manage account passwords in WhatsminerTool > Password.",
         "data": {
           "account": "API account",
           "password": "API password",
@@ -27,16 +26,10 @@
       },
       "web": {
         "title": "Individual chip web data",
-        "description": "Read the LuCI btminerapi syslog page or a normalized JSON endpoint. The default path uses HTTPS on port 443. LuCI authentication uses separate web credentials and renews the session when needed. Leave JSON Pointer blank for HTML or text. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Blank secret fields preserve existing values.",
+        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password.",
         "data": {
-          "web_protocol": "Web protocol",
-          "web_port": "Web port",
-          "web_path": "Observed GET path starting with /",
-          "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
-          "web_auth": "Web authentication (luci, none, basic, cookie)",
           "web_username": "Web username",
           "web_password": "Web password",
-          "web_cookie": "Web session cookie",
           "web_verify_ssl": "Verify HTTPS certificate"
         }
       }
@@ -46,8 +39,7 @@
       "password_required": "Enter the API password.",
       "invalid_limits": "Minimum must be below maximum.",
       "different_device": "Different miner at this address. Add it as a separate device.",
-      "invalid_web_endpoint": "Enter a relative path /… and a JSON Pointer /… or blank.",
-      "web_credentials_required": "Provide credentials for the selected WEB authentication method."
+      "web_credentials_required": "Enter the web username and password for LuCI login."
     },
     "abort": {
       "already_configured": "This miner is already configured."
@@ -59,16 +51,15 @@
         "title": "Connection settings",
         "data": {
           "host": "Host",
-          "port": "TCP port",
           "scan_interval": "Polling interval (seconds)",
           "enable_control": "Enable power control",
           "web_chips": "Read individual chips from WEB (experimental)"
         },
-        "description": "This is the first settings step. Select Submit to edit API account/password and power limits when power control is enabled, then web authentication when chip data is enabled. Settings are saved only after the final step."
+        "description": "This is the first settings step. Select Submit to edit API account/password and power limits when power control is enabled, then web authentication when chip data is enabled. Settings are saved only after the final step. The API connection uses TCP port 4433 automatically."
       },
       "control": {
         "title": "Power control",
-        "description": "Enter the password for the selected API account (super or user1-user3). These are separate from web login credentials. A blank password keeps the stored value. Select Submit to continue to web settings when enabled; changes are saved only after the final step. Saving does not issue power commands.",
+        "description": "Enter the password for the selected API account (super or user1-user3). These are separate from web login credentials. A blank password keeps the stored value. Select Submit to continue to web settings when enabled; changes are saved only after the final step. Saving does not issue power commands. The super account has its own password; do not assume the web admin password matches it. Manage account passwords in WhatsminerTool > Password.",
         "data": {
           "account": "API account",
           "password": "New API password",
@@ -80,16 +71,10 @@
       },
       "web": {
         "title": "Individual chip web data",
-        "description": "Read the LuCI btminerapi syslog page or a normalized JSON endpoint. The default path uses HTTPS on port 443. LuCI authentication uses separate web credentials and renews the session when needed. Leave JSON Pointer blank for HTML or text. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Blank secret fields preserve existing values.",
+        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password.",
         "data": {
-          "web_protocol": "Web protocol",
-          "web_port": "Web port",
-          "web_path": "Observed GET path starting with /",
-          "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
-          "web_auth": "Web authentication (luci, none, basic, cookie)",
           "web_username": "Web username",
           "web_password": "Web password",
-          "web_cookie": "Web session cookie",
           "web_verify_ssl": "Verify HTTPS certificate"
         }
       }
@@ -99,8 +84,7 @@
       "password_required": "Enter the API password.",
       "invalid_limits": "Minimum must be below maximum.",
       "different_device": "Different miner at this address. Add it separately.",
-      "invalid_web_endpoint": "Enter a relative path /… and a JSON Pointer /… or blank.",
-      "web_credentials_required": "Provide credentials for the selected WEB authentication method."
+      "web_credentials_required": "Enter the web username and password for LuCI login."
     }
   }
 }

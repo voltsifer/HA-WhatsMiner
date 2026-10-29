@@ -125,7 +125,8 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
                 if err.reason and "password" in err.reason.lower():
                     hint = (" Check the password for the selected API account (super or user1-user3)"
                             " in Configure: submit Connection settings, then edit Power control."
-                            " Web credentials and Basic/LuCI authentication are separate."
+                            " Web credentials for admin do not establish the password for super."
+                            " Manage the selected account password in WhatsminerTool > Password."
                             " The firmware message does not distinguish malformed JSON from a wrong password.")
                 elif err.code == -4:
                     hint = " Check API Write, the API account and API password; web authentication is separate."

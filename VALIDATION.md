@@ -1,15 +1,15 @@
-# HA-WhatsMiner 0.4.0 validation
+# HA-WhatsMiner 0.5.0 validation
 
 Date: October 29, 2026.
 
-**49 Python tests and 11 JavaScript tests pass: 60 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**52 Python tests and 11 JavaScript tests pass: 63 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
 | API 3.x TCP transport and authenticated writes | Local TCP emulator; framing, fragmented responses, heartbeats, timeouts, invalid/truncated/oversized responses and authentication vectors |
 | Power controls | Watt and percentage commands, bounds, tuning guard, separate measured/configured power and no automatic write retry |
 | Home Assistant integration | Core 2024.12.5 on Python 3.12; setup/unload, forms, number/select actions, dynamic discovery and availability |
-| Web JSON transport | Local HTTP emulator; Basic/Cookie authentication, JSON Pointer, identity checks and redirect rejection |
+| Low-level web helper compatibility | Local HTTP emulator; Basic/Cookie and JSON Pointer helper tests retained; these options are not part of the integration UI/profile |
 | LuCI HTML/plain-text parsing | Synthetic syslog pages and text, 172 chips per board, preserved C0-based IDs, missing readings, duplicate IDs, login pages and truncated HTML |
 | LuCI authentication | Local server; login form POST, IP-address cookies, session reuse, expired-cookie renewal and no repeated login loop after rejected credentials |
 | HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
@@ -55,4 +55,6 @@ The npm dependencies are only for development tests. The production card has no 
 
 Version 0.3.1 added tests for preserved and redacted API failure reasons, no write retry, rejected percentage command context in diagnostics, offline credential/authentication editing for an unchanged endpoint, and continued validation of a changed host.
 
-Version 0.4.0 adds optional per-chip metrics, spaced x/pct pair parsing, numeric validation, no cross-chip carryover, chip/map/diagnostics propagation, missing-temperature availability, selected-chip DOM details and the fast-mode password-error hint. The supplied device HTML was rechecked: all 516 chip records include the expected additional fields.
+Version 0.4.0 added optional per-chip metrics, spaced x/pct pair parsing, numeric validation, no cross-chip carryover, chip/map/diagnostics propagation, missing-temperature availability, selected-chip DOM details and the fast-mode password-error hint. The supplied device HTML was rechecked: all 516 chip records include the expected additional fields.
+
+Version 0.5.0 adds a three-field web form, fixed HTTPS:443 LuCI endpoint, automatic API port 4433 for new entries, and migration tests removing obsolete options while preserving API/web credentials, explicit TLS choice, entity identities and legacy API ports. Form, migration and reload operations issue no power commands. The API token and request algorithm are unchanged; super/admin credential guidance is based on the manufacturer operation guide.

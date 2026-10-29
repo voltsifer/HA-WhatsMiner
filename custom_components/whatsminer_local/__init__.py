@@ -6,10 +6,23 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CARD_URL, DOMAIN
+from .const import CARD_URL, DOMAIN, LEGACY_WEB_OPTIONS
 from .coordinator import WhatsminerCoordinator
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SELECT]
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Remove obsolete web endpoint/auth options without issuing device commands."""
+    if entry.version != 1:
+        return False
+    if entry.minor_version < 2:
+        hass.config_entries.async_update_entry(
+            entry, minor_version=2,
+            data={k: v for k, v in entry.data.items() if k not in LEGACY_WEB_OPTIONS},
+            options={k: v for k, v in entry.options.items() if k not in LEGACY_WEB_OPTIONS},
+        )
+    return True
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:

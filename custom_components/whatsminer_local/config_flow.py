@@ -7,20 +7,17 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .api import WhatsminerClient, WhatsminerError
-from .chip_web import validate_web_path
 from .const import (
     ACCOUNTS, CONF_ACCOUNT, CONF_CONTROL, CONF_MAX, CONF_MIN,
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN, CONF_PERCENT_MIN, CONF_PERCENT_MODE,
-    DEFAULT_PERCENT_MIN, CONF_WEB_CHIPS, CONF_WEB_PROTOCOL, CONF_WEB_PORT, CONF_WEB_PATH,
-    CONF_WEB_POINTER, CONF_WEB_AUTH, CONF_WEB_USERNAME, CONF_WEB_PASSWORD, CONF_WEB_COOKIE,
-    CONF_WEB_VERIFY_SSL, DEFAULT_WEB_PATH, DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT,
+    DEFAULT_PERCENT_MIN, CONF_WEB_CHIPS, CONF_WEB_USERNAME, CONF_WEB_PASSWORD,
+    CONF_WEB_VERIFY_SSL, LEGACY_WEB_OPTIONS,
 )
 
 
 def connection_schema(values):
     return vol.Schema({
         vol.Required(CONF_HOST, default=values.get(CONF_HOST, "")): str,
-        vol.Required(CONF_PORT, default=values.get(CONF_PORT, DEFAULT_PORT)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
         vol.Required(CONF_SCAN_INTERVAL, default=values.get(CONF_SCAN_INTERVAL, DEFAULT_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
         vol.Required(CONF_CONTROL, default=values.get(CONF_CONTROL, False)): bool,
         vol.Required(CONF_WEB_CHIPS, default=values.get(CONF_WEB_CHIPS, False)): bool,
@@ -43,7 +40,7 @@ def control_schema(values):
 
 async def probe(values):
     values[CONF_HOST] = values[CONF_HOST].strip().lower()
-    return await WhatsminerClient(values[CONF_HOST], values[CONF_PORT]).read_snapshot()
+    return await WhatsminerClient(values[CONF_HOST], values.get(CONF_PORT, DEFAULT_PORT)).read_snapshot()
 
 
 def control_error(values):
@@ -56,16 +53,10 @@ def control_error(values):
 
 def web_schema(values):
     fields = {
-        vol.Required(CONF_WEB_PROTOCOL, default=values.get(CONF_WEB_PROTOCOL, DEFAULT_WEB_PROTOCOL)): vol.In(("http", "https")),
-        vol.Required(CONF_WEB_PORT, default=values.get(CONF_WEB_PORT, DEFAULT_WEB_PORT)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-        vol.Required(CONF_WEB_PATH, default=values.get(CONF_WEB_PATH, DEFAULT_WEB_PATH)): str,
-        vol.Optional(CONF_WEB_POINTER, default=values.get(CONF_WEB_POINTER, "")): str,
-        vol.Required(CONF_WEB_AUTH, default=values.get(CONF_WEB_AUTH, "luci")): vol.In(("none", "basic", "cookie", "luci")),
-        vol.Optional(CONF_WEB_USERNAME, default=values.get(CONF_WEB_USERNAME, "")): str,
+        vol.Required(CONF_WEB_USERNAME, default=values.get(CONF_WEB_USERNAME) or "admin"): str,
         vol.Required(CONF_WEB_VERIFY_SSL, default=values.get(CONF_WEB_VERIFY_SSL, True)): bool,
     }
-    for key in (CONF_WEB_PASSWORD, CONF_WEB_COOKIE):
-        fields[vol.Optional(key)] = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
+    fields[vol.Optional(CONF_WEB_PASSWORD)] = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
     return vol.Schema(fields)
 
 
@@ -79,19 +70,10 @@ class WebFlowMixin:
         errors = {}
         if user_input is not None:
             combined = {**self._pending, **user_input}
-            for key in (CONF_WEB_PASSWORD, CONF_WEB_COOKIE):
-                if not user_input.get(key):
-                    combined[key] = self._pending.get(key, "")
-            try:
-                validate_web_path(combined[CONF_WEB_PATH])
-                pointer = combined.get(CONF_WEB_POINTER, "")
-                if pointer and not pointer.startswith("/"):
-                    raise ValueError("Invalid JSON pointer")
-            except ValueError:
-                errors["base"] = "invalid_web_endpoint"
-            if combined[CONF_WEB_AUTH] in ("basic", "luci") and not (combined.get(CONF_WEB_USERNAME) and combined.get(CONF_WEB_PASSWORD)):
-                errors["base"] = "web_credentials_required"
-            if combined[CONF_WEB_AUTH] == "cookie" and not combined.get(CONF_WEB_COOKIE):
+            combined = {key: value for key, value in combined.items() if key not in LEGACY_WEB_OPTIONS}
+            if not user_input.get(CONF_WEB_PASSWORD):
+                combined[CONF_WEB_PASSWORD] = self._pending.get(CONF_WEB_PASSWORD, "")
+            if not (combined.get(CONF_WEB_USERNAME, "").strip() and combined.get(CONF_WEB_PASSWORD)):
                 errors["base"] = "web_credentials_required"
             if not errors:
                 return self.async_create_entry(title=getattr(self, "_title", ""), data=combined)
@@ -100,6 +82,7 @@ class WebFlowMixin:
 
 class WhatsminerConfigFlow(WebFlowMixin, config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
+    MINOR_VERSION = 2
 
     @staticmethod
     @callback
@@ -115,7 +98,7 @@ class WhatsminerConfigFlow(WebFlowMixin, config_entries.ConfigFlow, domain=DOMAI
                 errors["base"] = "cannot_connect"
             else:
                 info = snapshot["info"]
-                identifier = info.get("network", {}).get("mac") or f"{user_input[CONF_HOST]}:{user_input[CONF_PORT]}"
+                identifier = info.get("network", {}).get("mac") or f"{user_input[CONF_HOST]}:{user_input.get(CONF_PORT, DEFAULT_PORT)}"
                 await self.async_set_unique_id(str(identifier).lower())
                 self._abort_if_unique_id_configured()
                 self._pending = user_input
@@ -143,13 +126,10 @@ class WhatsminerOptionsFlow(WebFlowMixin, config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             user_input[CONF_HOST] = user_input[CONF_HOST].strip().lower()
-            connection_changed = (
-                user_input[CONF_HOST] != current[CONF_HOST].strip().lower()
-                or user_input[CONF_PORT] != current.get(CONF_PORT, DEFAULT_PORT)
-            )
+            connection_changed = user_input[CONF_HOST] != current[CONF_HOST].strip().lower()
             try:
                 if connection_changed:
-                    snapshot = await probe(user_input)
+                    snapshot = await probe({**current, **user_input})
                     old = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
                     old_mac = old.snapshot.get("info", {}).get("network", {}).get("mac") if old else None
                     new_mac = snapshot["info"].get("network", {}).get("mac")

@@ -23,5 +23,9 @@ CONF_WEB_VERIFY_SSL = "web_verify_ssl"
 DEFAULT_WEB_PATH = "/cgi-bin/luci/admin/status/btminerapi"
 DEFAULT_WEB_PROTOCOL = "https"
 DEFAULT_WEB_PORT = 443
+LEGACY_WEB_OPTIONS = frozenset({
+    CONF_WEB_PROTOCOL, CONF_WEB_PORT, CONF_WEB_PATH, CONF_WEB_POINTER,
+    CONF_WEB_AUTH, CONF_WEB_COOKIE,
+})
 DEFAULT_PERCENT_MIN = 50
 CARD_URL = "/ha-whatsminer/ha-whatsminer-heatmap-card.js"
