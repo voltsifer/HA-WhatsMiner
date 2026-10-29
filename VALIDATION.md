@@ -1,8 +1,8 @@
-# HA-WhatsMiner 0.5.1 validation
+# HA-WhatsMiner 0.5.2 validation
 
 Date: October 29, 2026.
 
-**56 Python tests and 11 JavaScript tests pass: 67 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**56 Python tests and 16 JavaScript tests pass: 72 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
@@ -15,7 +15,7 @@ Date: October 29, 2026.
 | HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
 | Session cleanup | Isolated per-miner cookie session is detached on unload without closing Home Assistant's shared connector |
 | Heatmap calculations | Four Node.js tests for values, color scales, mapping and missing data |
-| Heatmap DOM | Seven happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
+| Heatmap DOM | Twelve happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
 | Project language | English labels, documentation and regenerated artwork; CI rejects Cyrillic text and removed language files |
 | Supplied device HTML | Parsed successfully: 3 boards × 172 chips, IDs C0–C171, no missing temperatures; raw private page is not included in the repository |
 | Actual miner operations | Live login, retrieval and power commands remain unverified on the user's private network |
@@ -60,3 +60,5 @@ Version 0.4.0 added optional per-chip metrics, spaced x/pct pair parsing, numeri
 Version 0.5.0 adds a three-field web form, fixed HTTPS:443 LuCI endpoint, automatic API port 4433 for new entries, and migration tests removing obsolete options while preserving API/web credentials, explicit TLS choice, entity identities and legacy API ports. Form, migration and reload operations issue no power commands. The API token and request algorithm are unchanged; super/admin credential guidance is based on the manufacturer operation guide.
 
 Version 0.5.1 adds staged transport errors and a read-only telemetry refresh after an unacknowledged percentage write. Tests distinguish authentication preparation from a write timeout, truncated response or invalid JSON, and verify matching/different/unavailable read-back with exactly one write attempt.
+
+Version 0.5.2 adds HeatMap discovery tests for three 172-chip boards without entity IDs, renamed/new/removed/unavailable sources, explicit selection across multiple miners, invalid mixed configuration, empty-state instructions and placeholder-free card picker defaults. Browser code uses only existing HA state data and sends no miner requests.

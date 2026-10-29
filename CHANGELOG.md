@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2
+
+- Discover web board maps automatically without manual entity IDs, including renamed entities and dynamically appearing boards.
+- Use automatic discovery in the card picker starter configuration and the main setup example. Preserve explicit entity selection for cards scoped to selected miners.
+- Distinguish non-existent entity IDs from unavailable chip data and explain empty discovery results. Never create synthetic readings or reuse stale unavailable data.
+- Keep the permanent JavaScript resource URL unchanged.
+- Pass 72 automated tests (56 Python, 16 JavaScript).
+
 ## 0.5.1
 
 - Distinguish salt-preparation failures from transport errors during power writes, including timeout, connection closure and invalid JSON.

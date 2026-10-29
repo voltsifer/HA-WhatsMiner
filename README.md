@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.1**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.2**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -18,7 +18,7 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - Chip frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values in map attributes and chip details.
 - Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
 - Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials and certificate verification are configured.
-- A heatmap card with chip IDs, temperatures, statistics, median deviations and explicit board layouts.
+- A heatmap card with automatic board discovery, chip IDs, temperatures, statistics, median deviations and explicit board layouts.
 - One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
 - Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
 
@@ -34,7 +34,7 @@ Repository: **https://github.com/voltsifer/HA-WhatsMiner**.
 
 Start with power control and web chip data disabled, then compare API telemetry with the miner's interface. HACS installs the heatmap JavaScript with the integration; a second dashboard repository is unnecessary. See [HEATMAP.md](HEATMAP.md) for resource registration.
 
-Register the card once at `/ha-whatsminer/ha-whatsminer-heatmap-card.js` as a JavaScript module. This URL stays the same across releases. After an integration update and HA restart, reload the dashboard page to load the updated card. A version query parameter is not required.
+Register the card once at `/ha-whatsminer/ha-whatsminer-heatmap-card.js` as a JavaScript module. This URL stays the same across releases. After an integration update and HA restart, reload the dashboard page to load the updated card. A version query parameter is not required. Use `auto_discover: true` in the card configuration to find board maps without entering entity IDs; see [HEATMAP.md](HEATMAP.md).
 
 ### Manual installation and upgrades
 

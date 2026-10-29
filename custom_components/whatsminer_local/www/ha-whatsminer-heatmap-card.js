@@ -1,4 +1,4 @@
-/* HA-WhatsMiner 0.5.1 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.5.2 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);
@@ -65,9 +65,15 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;fl
 
 export class HAWhatsminerHeatmapCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this._mode = "absolute"; }
+  static getStubConfig() {
+    return { auto_discover: true, columns: 14, min_temperature: 60, max_temperature: 100 };
+  }
   setConfig(config) {
     const entities = config.entities || (config.entity ? [config.entity] : []);
-    if (!Array.isArray(entities) || !entities.length || entities.some(id => typeof id !== "string" || !id.startsWith("sensor."))) throw new Error("Specify entity or entities for web chip map sensors");
+    const autoDiscover = config.auto_discover ?? (!config.entities && !config.entity);
+    if (typeof autoDiscover !== "boolean") throw new Error("auto_discover must be true or false");
+    if (!Array.isArray(entities) || (!autoDiscover && !entities.length) || entities.some(id => typeof id !== "string" || !id.startsWith("sensor."))) throw new Error("Specify web chip map sensors or use auto_discover: true without entity/entities");
+    if (autoDiscover && entities.length) throw new Error("Remove entity/entities when using auto_discover: true");
     const min = config.min_temperature ?? 70, max = config.max_temperature ?? 110;
     if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error("Check the color scale limits");
     const columns = config.columns ?? 10;
@@ -79,16 +85,28 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
         layoutCells([], rows, columns);
       }
     }
-    this._config = { ...config, entities, min_temperature: min, max_temperature: max, columns };
+    this._config = { ...config, entities, auto_discover: autoDiscover, min_temperature: min, max_temperature: max, columns };
+    this._discovered = new Set();
     this._previous = undefined;
     this._render();
   }
   set hass(hass) {
     this._hass = hass;
-    const next = this._config?.entities.map(id => hass.states[id]);
-    if (next && this._previous && next.every((state, i) => state === this._previous[i])) return;
+    const next = this._entityIds().map(id => [id, hass.states[id]]);
+    if (this._previous && next.length === this._previous.length && next.every(([id, state], i) => id === this._previous[i][0] && state === this._previous[i][1])) return;
     this._previous = next;
     this._render();
+  }
+  _entityIds() {
+    if (!this._config || !this._hass) return [];
+    if (!this._config.auto_discover) return this._config.entities;
+    for (const [id, state] of Object.entries(this._hass.states)) {
+      const attrs = state.attributes;
+      if (id.startsWith("sensor.") && attrs?.source === "web" && Number.isInteger(attrs.slot) && Array.isArray(attrs.chips)) this._discovered.add(id);
+    }
+    // Keep known unavailable sources visible; removed/renamed entities are forgotten.
+    for (const id of this._discovered) if (!this._hass.states[id]) this._discovered.delete(id);
+    return [...this._discovered].sort((a, b) => a.localeCompare(b));
   }
   getCardSize() { return 5; }
   getGridOptions() { return { columns: "full", rows: "auto", min_columns: 6 }; }
@@ -118,10 +136,15 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     }
     header.append(modes); card.append(header);
     const details = this._node("div", "details", "Select a chip to view its temperature, median deviation and available telemetry.");
-    for (const id of cfg.entities) {
+    const entities = this._entityIds();
+    if (!entities.length) card.append(this._node("div", "message", "No web chip maps found. Enable web chip data in HA-WhatsMiner and check that Board N web chip map sensors are enabled and available."));
+    for (const id of entities) {
       const state = this._hass.states[id];
       const board = this._node("section", "board"); card.append(board);
-      if (!state || state.state === "unavailable" || !Array.isArray(state.attributes.chips) || !state.attributes.chips.length) {
+      if (!state) {
+        board.append(this._node("div", "message", `${id}: entity does not exist. Replace example entity IDs with actual Board N web chip map sensors, or remove entity/entities and use auto_discover: true.`)); continue;
+      }
+      if (state.state === "unavailable" || !Array.isArray(state.attributes.chips) || !state.attributes.chips.length) {
         board.append(this._node("div", "message", `${id}: no fresh chip data`)); continue;
       }
       const chips = state.attributes.chips.map(chip => ({ ...chip, id: String(chip.id), temperature: finiteTemperature(chip.temperature) }));
@@ -129,7 +152,7 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       const reference = median(values);
       const slot = state.attributes.slot;
       const boardHead = this._node("div", "boardhead");
-      boardHead.append(this._node("div", "boardname", `Board · Slot ${slot ?? "?"}`));
+      boardHead.append(this._node("div", "boardname", cfg.auto_discover && state.attributes.friendly_name ? state.attributes.friendly_name : `Board · Slot ${slot ?? "?"}`));
       boardHead.append(this._node("div", "stats", values.length ? `min ${Math.min(...values).toFixed(1)}° · avg ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}° · max ${Math.max(...values).toFixed(1)}° · ${values.length}/${chips.length}` : "No readings"));
       board.append(boardHead);
       if (chips.some(chip => Object.hasOwn(chip, "voltage_raw") || Object.hasOwn(chip, "frequency_raw"))) {

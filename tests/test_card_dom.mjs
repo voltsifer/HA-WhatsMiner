@@ -79,3 +79,66 @@ test('Explicit missing positions remain visible and unmatched chips are labelled
   assert.equal(card.shadowRoot.querySelectorAll('.missing').length, 2);
   assert.match(card.shadowRoot.textContent, /outside the specified layout/);
 });
+
+function autoCard(states = {}, config = { auto_discover: true }) {
+  const card = document.createElement('ha-whatsminer-heatmap-card');
+  document.body.append(card);
+  card.setConfig(config);
+  card.hass = { states };
+  return card;
+}
+function boardState(slot, friendlyName = `Miner board ${slot}`) {
+  return { state: '73', attributes: { source: 'web', slot, friendly_name: friendlyName,
+    chips: Array.from({length: 172}, (_, index) => ({id: `C${index}`, temperature: 73})) } };
+}
+
+test('Auto discovery renders three 172-chip boards without configured entity IDs', () => {
+  const card = autoCard({
+    'sensor.actual_renamed_board_2': boardState(2),
+    'sensor.actual_renamed_board_0': boardState(0),
+    'sensor.actual_renamed_board_1': boardState(1),
+    'sensor.chip_temperature': { state: '73', attributes: { source: 'web', slot: 0, chip_id: 'C0' } },
+    'sensor.unrelated': { state: '1', attributes: { chips: [{id: 'not-a-board', temperature: 1}] } },
+  });
+  assert.equal(card.shadowRoot.querySelectorAll('.board').length, 3);
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 516);
+  assert.equal(card.shadowRoot.querySelector('.boardname').textContent, 'Miner board 0');
+});
+
+test('Discovery responds to new, removed, renamed and unavailable boards', () => {
+  const zero = boardState(0);
+  const card = autoCard({'sensor.zero': zero});
+  card.hass = { states: { 'sensor.zero': zero, 'sensor.one': boardState(1) } };
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 344);
+  card.hass = { states: { 'sensor.zero': zero } };
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 172);
+  card.hass = { states: { 'sensor.renamed_zero': zero } };
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 172);
+  card.hass = { states: { 'sensor.renamed_zero': { state: 'unavailable', attributes: {} } } };
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 0);
+  assert.match(card.shadowRoot.textContent, /sensor.renamed_zero: no fresh chip data/);
+  card.hass = { states: { 'sensor.renamed_zero': zero } };
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 172);
+});
+
+test('Discovery with no maps explains source setup and picker stub has no placeholders', () => {
+  const card = autoCard({}, {});
+  assert.match(card.shadowRoot.textContent, /No web chip maps found.*Enable web chip data/);
+  assert.equal(card.constructor.getStubConfig().auto_discover, true);
+  assert.ok(!Object.hasOwn(card.constructor.getStubConfig(), 'entities'));
+});
+
+test('Missing explicit entity explains how to replace example IDs', () => {
+  const card = autoCard({}, {entity: 'sensor.replace_with_board_0_web_map'});
+  assert.match(card.shadowRoot.textContent, /entity does not exist.*auto_discover: true/);
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 0);
+});
+
+test('Explicit selection stays scoped and invalid mixed discovery configuration is rejected', () => {
+  const states = {'sensor.miner_a': boardState(0, 'Miner A'), 'sensor.miner_b': boardState(0, 'Miner B')};
+  const card = autoCard(states, {entity: 'sensor.miner_a'});
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 172);
+  assert.throws(() => card.setConfig({entity: 'sensor.miner_a', auto_discover: true}), /Remove entity\/entities/);
+  assert.throws(() => card.setConfig({auto_discover: 'true'}), /must be true or false/);
+  assert.throws(() => card.setConfig({auto_discover: false}), /Specify web chip map/);
+});

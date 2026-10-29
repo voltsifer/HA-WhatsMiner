@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.5.1** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
+Version **0.5.2** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
 
 ## Known endpoint
 

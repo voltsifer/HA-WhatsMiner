@@ -9,23 +9,33 @@ The JavaScript is installed with the integration, including HACS installations. 
 1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
 2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js`**, type **JavaScript module**. Use this permanent URL without a version query parameter.
 3. Reload the browser. After integration upgrades, restart Home Assistant and reload the dashboard page; the resource URL stays unchanged. If an old card remains cached, perform a hard refresh or clear the frontend cache. An already open page keeps its loaded JavaScript until it is reloaded.
-4. Open your dashboard, select **Edit → Add card → Manual**, and use the actual entity IDs of your **Board N web chip map** sensors. Find those IDs under **Developer tools → States** or the miner device page. Individual chip temperature sensors can remain disabled:
+4. Open your dashboard, select **Edit → Add card → Manual**, and use automatic discovery. Individual chip temperature sensors can remain disabled:
 
 ```yaml
 type: custom:ha-whatsminer-heatmap-card
 title: WhatsMiner chip temperatures
-entities:
-  - sensor.replace_with_board_0_web_map
-  - sensor.replace_with_board_1_web_map
-  - sensor.replace_with_board_2_web_map
+auto_discover: true
 columns: 14
 min_temperature: 70
 max_temperature: 110
 ```
 
-List only boards that actually exist. The integration does not assume three boards. `columns` controls the logical grid width, not physical board geometry. A board with 172 readings produces 172 chip cells, including cells whose readings are missing. The 70–110°C values define only the color scale, not recommended operating limits.
+Automatic discovery finds enabled Board N web chip map sensors by their source/slot/chips attributes, including renamed entities. It discovers all available miners, not just the first miner or three fixed boards. Board friendly names identify the sources. A new board appears on the next HA state update; known sources that become unavailable display a data error rather than stale temperatures. No entities or settings are changed by discovery. `columns` controls the logical grid width, not physical board geometry. A board with 172 readings produces 172 chip cells, including cells whose readings are missing. The 70–110°C values define only the color scale, not recommended operating limits. The card picker also provides an automatic-discovery starter configuration without placeholder entity IDs.
 
 If you previously registered a URL ending in `?v=...`, edit that existing resource once and remove the query parameter. Do not add a duplicate resource. The unversioned path is already supported by the integration; no new integration release is required for this URL change. The static resource is registered with Home Assistant's long-lived cache headers disabled.
+
+## Explicit selection (optional)
+
+If several miners are configured and a card should show only selected boards, omit `auto_discover` and specify the actual board map entity IDs:
+
+```yaml
+type: custom:ha-whatsminer-heatmap-card
+entities:
+  - sensor.replace_with_actual_board_map
+columns: 14
+```
+
+This explicit example requires replacing its placeholder. Find the actual IDs under **Developer tools → States** or on the miner device page. A non-existent entity is reported as **entity does not exist**, with instructions to use real IDs or automatic discovery. Do not combine `auto_discover: true` with `entity` or `entities`. When neither is specified, discovery is enabled by default.
 
 ## Display
 
@@ -64,5 +74,7 @@ Use the actual IDs returned by your source. LuCI logs commonly use `C0` and subs
 ## Troubleshooting
 
 - **Custom element does not exist**: verify the JavaScript resource URL and module type, then reload the browser. Installing the integration through HACS does not automatically register this custom dashboard resource.
+- **Entity does not exist**: the configuration points to an unknown ID, often an unchanged example. Remove `entity`/`entities` and use `auto_discover: true`, or select actual board map entities.
+- **No web chip maps found**: no suitable source is visible yet. Enable web chip data and the board map sensors, then check Web chip data status.
 - **No fresh chip data**: check that the selected entity is a Board N web chip map sensor, is enabled and available, and exposes a non-empty `chips` attribute. Check Web chip data status for a source/login/certificate failure.
 - **No separate voltage/error entities**: optional chip metrics are attributes of each chip, not additional sensor entities. Select or hover a chip to inspect them. The map color scale remains temperature-only.
