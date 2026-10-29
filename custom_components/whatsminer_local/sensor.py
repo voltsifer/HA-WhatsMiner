@@ -106,7 +106,7 @@ class WhatsminerSensor(WhatsminerEntity, SensorEntity):
 
 class WhatsminerWebBoardSensor(WhatsminerSensor):
     """One state per board; card gets all chip values from unrecorded attributes."""
-    _unrecorded_attributes = frozenset({"chips", "updated_at"})
+    _unrecorded_attributes = frozenset({"chips", "updated_at", "chip_snapshot"})
 
     def __init__(self, coordinator, key, slot):
         super().__init__(coordinator, key, (
@@ -123,7 +123,8 @@ class WhatsminerWebBoardSensor(WhatsminerSensor):
     def extra_state_attributes(self):
         chips = next((b["chips"] for b in self.coordinator.chip_boards if b["slot"] == self.slot), [])
         return {"slot": self.slot, "chips": chips, "updated_at": self.coordinator.chip_updated_at,
-                "source": "web", "chip_count": len(chips)}
+                "source": "web", "chip_count": len(chips),
+                "chip_snapshot": self.coordinator.chip_snapshots.get(self.slot)}
 
 
 class WhatsminerChipSensor(WhatsminerSensor):

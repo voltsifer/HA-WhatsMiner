@@ -1,6 +1,7 @@
 """One shared polling coordinator per miner."""
 import asyncio
 from datetime import timedelta
+import json
 import logging
 from time import monotonic
 
@@ -12,7 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import WhatsminerClient, WhatsminerError, flatten
-from .chip_web import ChipWebClient, ChipWebError
+from .chip_web import CHIP_METRICS, ChipWebClient, ChipWebError
 from .const import (
     CONF_PERCENT_MODE, CONF_WEB_CHIPS, CONF_WEB_PASSWORD, CONF_WEB_USERNAME,
     CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL,
@@ -33,6 +34,7 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         self.percent_mode = self.config.get(CONF_PERCENT_MODE, "normal")
         self.last_power_percent_command = None
         self.chip_boards = []
+        self.chip_snapshots = {}
         self.chip_updated_at = None
         self.web_interval = self.config.get(CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL)
         self._web_next_poll = 0.0
@@ -59,6 +61,7 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         if self.web_client is not None and monotonic() >= self._web_next_poll:
             # WEB failures invalidate only the chip readings, not API telemetry.
             self.chip_boards = []
+            self.chip_snapshots = {}
             self.chip_updated_at = None
             self._web_values = {}
             try:
@@ -69,6 +72,16 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
                 self.chip_updated_at = dt_util.utcnow().isoformat()
                 self._web_values["chip-web-status"] = "ok"
                 for board in self.chip_boards:
+                    # InfluxDB stringifies attributes with str(), which is not JSON
+                    # for nested arrays. Cache one explicit JSON snapshot per WEB read.
+                    self.chip_snapshots[board["slot"]] = json.dumps({
+                        "schema_version": 1,
+                        "slot": board["slot"],
+                        "updated_at": self.chip_updated_at,
+                        "chips": [{key: chip[key] for key in (
+                            "id", "temperature", *CHIP_METRICS, "row", "column"
+                        ) if key in chip} for chip in board["chips"]],
+                    }, allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
                     temperatures = [c["temperature"] for c in board["chips"] if c["temperature"] is not None]
                     self._web_values[f"web-board-{board['slot']}-chip-max"] = max(temperatures) if temperatures else None
                     for chip in board["chips"]:

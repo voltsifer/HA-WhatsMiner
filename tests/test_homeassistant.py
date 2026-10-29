@@ -224,6 +224,76 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.hass.states.get(board.entity_id).attributes['chips'][0]['errors'], 4)
             self.assertNotEqual(coordinator.chip_updated_at, first_update)
 
+    async def test_board_json_snapshots_are_complete_cached_and_unrecorded(self):
+        import json
+        from custom_components.whatsminer_local.chip_web import CHIP_METRICS, ChipWebError
+        from custom_components.whatsminer_local.sensor import WhatsminerWebBoardSensor
+        clock = [100.0]
+        readings = [
+            {'slot': slot, 'password': 'do-not-export-board-secret', 'chips': [
+                {'id': f'C{index}', 'temperature': 73 + slot,
+                 **{key: 0 for key in CHIP_METRICS},
+                 'voltage_raw': 275, 'frequency_raw': 480,
+                 'repeat': None, 'row': index // 22, 'column': index % 22,
+                 'password': 'do-not-export-chip-secret'}
+                for index in range(172)
+            ]} for slot in range(3)
+        ]
+        with patch('custom_components.whatsminer_local.coordinator.monotonic', side_effect=lambda: clock[0]), \
+             patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips',
+                   new=AsyncMock(return_value=readings)) as read_chips:
+            entry = await self.add_entry(extra={'web_chips': True})
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            boards = [state for state in self.hass.states.async_all('sensor')
+                      if state.attributes.get('source') == 'web']
+            self.assertEqual(len(boards), 3)
+            self.assertIn('chip_snapshot', WhatsminerWebBoardSensor._unrecorded_attributes)
+            cached = coordinator.chip_snapshots
+            for board in boards:
+                slot = board.attributes['slot']
+                text = board.attributes['chip_snapshot']
+                self.assertIsInstance(text, str)
+                self.assertNotIn('do-not-export', text)
+                payload = json.loads(text)
+                self.assertEqual(set(payload), {'schema_version', 'slot', 'updated_at', 'chips'})
+                self.assertEqual(payload['schema_version'], 1)
+                self.assertEqual(payload['slot'], slot)
+                self.assertEqual(payload['updated_at'], board.attributes['updated_at'])
+                self.assertEqual(len(payload['chips']), 172)
+                self.assertEqual([chip['id'] for chip in payload['chips']],
+                                 [f'C{index}' for index in range(172)])
+                expected = {key: value for key, value in readings[slot]['chips'][0].items()
+                            if key != 'password'}
+                self.assertEqual(payload['chips'][0], expected)
+                self.assertIsNone(payload['chips'][0]['repeat'])
+                self.assertEqual(payload['chips'][0]['errors'], 0)
+                self.assertNotIn('pcbLabel', payload['chips'][0])
+            initial = cached[0]
+            clock[0] = 3699
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            read_chips.assert_awaited_once()
+            self.assertIs(coordinator.chip_snapshots, cached)
+            self.assertIs(coordinator.chip_snapshots[0], initial)
+            clock[0] = 3700
+            readings[0]['chips'][0]['errors'] = 2
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            self.assertEqual(read_chips.await_count, 2)
+            updated = coordinator.chip_snapshots[0]
+            self.assertNotEqual(updated, initial)
+            self.assertEqual(json.loads(updated)['chips'][0]['errors'], 2)
+            self.assertNotEqual(json.loads(updated)['updated_at'], json.loads(initial)['updated_at'])
+            clock[0] = 7300
+            read_chips.side_effect = ChipWebError('web_auth_required')
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            self.assertEqual(coordinator.chip_snapshots, {})
+            for board in boards:
+                state = self.hass.states.get(board.entity_id)
+                self.assertEqual(state.state, 'unavailable')
+                self.assertIsNone(state.attributes.get('chip_snapshot'))
+
     async def test_failed_hourly_chip_poll_waits_before_retry_and_recovers(self):
         from custom_components.whatsminer_local.chip_web import ChipWebError
         clock = [100.0]

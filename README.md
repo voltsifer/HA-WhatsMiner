@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.4**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.5**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -20,6 +20,7 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials, certificate verification and the chip polling interval are configured.
 - A heatmap card with automatic board discovery, chip IDs, temperatures, statistics, median deviations and explicit board layouts.
 - An opt-in M60VK2A layout reconstructed from board photographs, with compact U-only cells, a full-width panel example and a visible unverified WEB-to-PCB mapping notice.
+- A Grafana historical M60VK2A dashboard with metric selection and complete per-board InfluxDB snapshots; see [GRAFANA.md](GRAFANA.md).
 - Independent chip-data polling: once per hour by default, while API telemetry keeps its configured interval.
 - One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
 - Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
@@ -41,6 +42,10 @@ Register the card once at `/ha-whatsminer/ha-whatsminer-heatmap-card.js` as a Ja
 For three M60VK2A boards on a desktop monitor, use `layout: m60vk2a` with the default compact display and a dedicated full-width Panel view. See [the complete view example](examples/m60vk2a-panel.yaml). The chip cells show U labels; their original WEB C IDs remain available in tooltips and selected-chip details.
 
 WEB chip temperatures and all other per-chip metrics now update every **3600 seconds** by default, including existing configurations without a chip interval. The first read after setup/reload is immediate. API telemetry continues at its existing interval, normally 30 seconds. Change **Chip data polling interval (seconds)** on the WEB step of Configure if needed; it accepts 60–86400 seconds. The last chip data and timestamp remain unchanged between successful reads; HeatMap is therefore an hourly snapshot by default.
+
+### Historical heatmap in Grafana
+
+Version 0.5.5 adds a cached `chip_snapshot` JSON string on each existing board map for InfluxDB export. No individual chip entities, new database credentials or extra miner requests are required. Import [grafana/whatsminer-m60vk2a.json](grafana/whatsminer-m60vk2a.json) after configuring the existing HA InfluxDB export and the Business Charts plugin; follow [GRAFANA.md](GRAFANA.md). Complete board snapshots use the same hourly WEB reads and their read timestamps. The dashboard supports temperature and all available raw chip metrics, missing values and a bounded historical lookup ending at Grafana's **To** time. It does not reconstruct earlier missing history or verify the assumed physical correspondence.
 
 ### Manual installation and upgrades
 

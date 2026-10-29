@@ -1,4 +1,4 @@
-/* HA-WhatsMiner 0.5.4 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.5.5 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);

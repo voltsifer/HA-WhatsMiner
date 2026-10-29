@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.5
+
+- Add a ready-to-import Grafana M60VK2A dashboard with source-preserving U labels, a selector for all normalized chip metrics, per-board read times and historical selection at the time range endpoint. Use the signed Business Charts plugin and existing InfluxDB 2.x / Flux data source.
+- Cache one allowlisted JSON snapshot per board on the existing hourly WEB read and expose it on the board map. Keep snapshots unchanged between API polls, clear them on WEB failure, and exclude the bulk attribute from Recorder. No new entities, direct database credentials or miner requests are added.
+- Provide InfluxDB export settings for three complete snapshots per hour, bounded historical queries, plugin installation and retention guidance. Preserve missing/stale/future handling and visible mapping uncertainty.
+- Test actual ECharts SVG rendering/resizing and snapshot schema/cache propagation. Pass 91 automated tests (60 Python, 31 JavaScript).
+
 ## 0.5.4
 
 - Read WEB chip data once per hour by default, independently of the existing API interval, including existing entries. Add a 60–86400-second chip polling option; keep the last measurement timestamp between reads and space retries after failures. Setup and reload still read immediately.

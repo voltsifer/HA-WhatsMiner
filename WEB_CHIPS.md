@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.5.4** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** The user has confirmed live chip retrieval in HAOS on an M60VK2A; this development environment cannot independently reach the private miner.
+Version **0.5.5** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** The user has confirmed live chip retrieval in HAOS on an M60VK2A; this development environment cannot independently reach the private miner.
 
 ## Known endpoint
 
@@ -106,6 +106,7 @@ The parser helper supports nested responses with a JSON Pointer for development,
 
 After a successful response:
 
+- **Board N web chip map** also exposes a cached `chip_snapshot` JSON string for the optional historical Grafana dashboard. It carries schema version, slot, the successful WEB read time and all normalized chip records. It is excluded from Recorder attributes. See [GRAFANA.md](GRAFANA.md) before enabling InfluxDB snapshot export.
 - **Board N web chip map** reports the maximum individual chip temperature. Its `chips` attribute contains IDs and measurements, with `updated_at` and `chip_count` metadata.
 - Individual chip temperature sensors are created disabled by default. Their attributes expose the same optional chip metrics. Enable selected sensors for history or automations; no additional entity is created for every metric of every chip. Use a template sensor for a selected metric when separate metric history is required.
 - **Web chip data status** reports `ok` or a sanitized failure reason.

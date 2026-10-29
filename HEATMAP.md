@@ -158,3 +158,7 @@ Manual `layouts` continue to use the supplied source IDs without applying the pr
 - **Both layout options specified**: keep either the named `layout` preset or manual `layouts`, not both.
 - **M60VK2A mapping warning**: this is intentional. The preset's `Cn → U(n+1)` correspondence has not been verified; selecting the preset does not establish that correspondence or turn it into a manufacturer drawing.
 - **Only part of a board is visible or the card occupies a narrow column**: use the full-width Panel view above with card version 0.5.4 or later and `compact: true`. Compact cells cannot change the surrounding dashboard view layout. Reload the browser after updating.
+
+## Historical snapshots in Grafana
+
+The Home Assistant card displays live HA states. For archived M60VK2A maps with a date/time selector and multiple metrics, use the separate [Grafana dashboard](GRAFANA.md). Its export settings keep individual chip series excluded while allowing complete board snapshots into InfluxDB. The broad board-map exclusion above stops that archive and must be removed when enabling the Grafana snapshot export.

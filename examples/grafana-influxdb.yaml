@@ -1,0 +1,28 @@
+# Merge into Home Assistant /config/configuration.yaml, not app options.
+# Preserve existing InfluxDB connection settings and unrelated filters.
+# If influxdb: already exists, merge its contents; do not add a second key.
+# Remove the earlier sensor.*_web_chip_map exclusion to allow snapshots.
+influxdb:
+  exclude:
+    entity_globs:
+      # Individual chip series are unnecessary for the snapshot dashboard.
+      - "sensor.*_chip_*_web_temperature"
+  component_config_glob:
+    # For renamed map entities, use component_config with actual entity IDs.
+    "sensor.*_web_chip_map":
+      override_measurement: whatsminer_chip_snapshots
+      ignore_attributes:
+        # Export the atomic chip_snapshot string instead of this Python repr.
+        - chips
+        - updated_at
+        - slot
+        - source
+        - chip_count
+        - friendly_name
+        - device_class
+        - state_class
+        - unit_of_measurement
+# Do not ignore chip_snapshot or make it a tag.
+# Home Assistant writes it as field chip_snapshot_str.
+# Existing include rules may need the board entities added explicitly.
+# See GRAFANA.md for compatibility, filters, retention and verification.
