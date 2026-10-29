@@ -2,6 +2,7 @@
 import asyncio
 from datetime import timedelta
 import logging
+from time import monotonic
 
 import aiohttp
 
@@ -14,6 +15,7 @@ from .api import WhatsminerClient, WhatsminerError, flatten
 from .chip_web import ChipWebClient, ChipWebError
 from .const import (
     CONF_PERCENT_MODE, CONF_WEB_CHIPS, CONF_WEB_PASSWORD, CONF_WEB_USERNAME,
+    CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL,
     CONF_WEB_VERIFY_SSL, DEFAULT_WEB_PATH, DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT,
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN,
 )
@@ -32,6 +34,9 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         self.last_power_percent_command = None
         self.chip_boards = []
         self.chip_updated_at = None
+        self.web_interval = self.config.get(CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL)
+        self._web_next_poll = 0.0
+        self._web_values = {}
         self.web_client = None
         if self.config.get(CONF_WEB_CHIPS):
             self.web_client = ChipWebClient(
@@ -51,20 +56,25 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         except (WhatsminerError, TypeError, KeyError, AttributeError, ValueError) as err:
             raise UpdateFailed("Could not read WhatsMiner API 3.x telemetry") from err
         self.snapshot = snapshot
-        if self.web_client is not None:
+        if self.web_client is not None and monotonic() >= self._web_next_poll:
             # WEB failures invalidate only the chip readings, not API telemetry.
             self.chip_boards = []
             self.chip_updated_at = None
+            self._web_values = {}
             try:
                 self.chip_boards = await self.web_client.read_chips()
             except ChipWebError as err:
-                values["chip-web-status"] = str(err)
+                self._web_values["chip-web-status"] = str(err)
             else:
                 self.chip_updated_at = dt_util.utcnow().isoformat()
-                values["chip-web-status"] = "ok"
+                self._web_values["chip-web-status"] = "ok"
                 for board in self.chip_boards:
                     temperatures = [c["temperature"] for c in board["chips"] if c["temperature"] is not None]
-                    values[f"web-board-{board['slot']}-chip-max"] = max(temperatures) if temperatures else None
+                    self._web_values[f"web-board-{board['slot']}-chip-max"] = max(temperatures) if temperatures else None
                     for chip in board["chips"]:
-                        values[f"web-chip-{board['slot']}-{chip['id']}"] = chip["temperature"]
+                        self._web_values[f"web-chip-{board['slot']}-{chip['id']}"] = chip["temperature"]
+            finally:
+                # Space attempts after failures too, including explicit API refreshes.
+                self._web_next_poll = monotonic() + self.web_interval
+        values.update(self._web_values)
         return values

@@ -1,0 +1,15 @@
+# Complete dashboard view, not a card-only configuration.
+# When editing a whole dashboard, add this object under its existing views list.
+# Panel views contain exactly one card and give it the full available width.
+# Photo-based M60VK2A reconstruction; WEB Cn -> PCB U(n+1) is unverified.
+title: WhatsMiner
+path: whatsminer
+type: panel
+cards:
+  - type: custom:ha-whatsminer-heatmap-card
+    title: M60VK2A chip temperatures
+    auto_discover: true
+    layout: m60vk2a
+    compact: true
+    min_temperature: 60
+    max_temperature: 100

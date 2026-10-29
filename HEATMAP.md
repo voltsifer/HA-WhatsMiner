@@ -39,7 +39,7 @@ This explicit example requires replacing its placeholder. Find the actual IDs un
 
 ## Display
 
-- Every source chip ID and temperature.
+- Chip label and temperature. The M60VK2A preset shows only `U1…U172` on its cells; other layouts show source IDs.
 - Board minimum, average, maximum and available reading count.
 - Selected chip details, including deviation from its board median and available frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values. Hover or select a chip to inspect them; the color scale still represents temperature.
 - A switch between absolute temperature and median deviation. The deviation scale is fixed at −15 to +15°C.
@@ -83,19 +83,50 @@ type: custom:ha-whatsminer-heatmap-card
 title: M60VK2A chip temperatures
 auto_discover: true
 layout: m60vk2a
+compact: true
 min_temperature: 60
 max_temperature: 100
 ```
 
-A ready-to-copy configuration is also available in [examples/m60vk2a-heatmap.yaml](examples/m60vk2a-heatmap.yaml). The preset supplies its own 22-column arrangement; `columns` is not needed for it. It creates no additional entities and uses the existing web board maps.
+A ready-to-copy card configuration is also available in [examples/m60vk2a-heatmap.yaml](examples/m60vk2a-heatmap.yaml). The preset supplies its own 22-column arrangement; `columns` is not needed for it. It creates no additional entities and uses the existing web board maps.
 
 The orientation follows the supplied board photographs: **power contacts on the left, signal connector on the right**. There are eight chip rows, with an upper block of 84 positions and a lower block of 88 positions, separated by a central gap. Visible PCB labels support the alternating direction of the four-chip columns. Partly covered positions and endpoints are reconstructed from that pattern; horizontal alignment and spacing are schematic rather than a measurement of the PCB.
 
 **The mapping from WEB IDs `C0…C171` to PCB labels `U1…U172` is unverified.** The preset currently assumes `Cn → U(n+1)`. It keeps a visible warning, and any PCB labels it shows are assumed labels. The temperature and other telemetry still come from the source `C…` records; the assumption affects their placement. Verify this correspondence before using a cell to locate a physical chip.
 
+Since version 0.5.4, M60VK2A cells show only the `U…` label and temperature, without a second `C…` label. Hover or select a chip to see its original WEB `C…` ID, assumed PCB label and available telemetry. Removing the duplicate cell label does not verify the numbering correspondence or change the source data.
+
 This is not a manufacturer schematic or an automatically detected board profile. No supplied photographs or board serial numbers are distributed with the preset. Selecting `layout: m60vk2a` applies it to all board maps in that card. If automatic discovery would include miners with different board models, use explicit entity selection instead.
 
 An unknown `layout` value is rejected. Do not combine the named `layout` option with the manual `layouts` option below.
+
+### Compact display and full-width view
+
+Version 0.5.4 enables `compact: true` by default for `layout: m60vk2a`. The 22 columns resize to the card width, while smaller cells and reduced spacing keep three boards stacked vertically. Shared explanatory text is kept outside the individual board grids. Use `compact: false` if larger cells are preferred.
+
+For three boards on a desktop monitor, give the card the full dashboard width. Home Assistant's [Panel view](https://www.home-assistant.io/dashboards/panel/) renders exactly one card at full width. A narrow masonry or sidebar column remains narrow regardless of the card's compact setting.
+
+The following is a complete **view** configuration. Use it for the dedicated WhatsMiner dashboard view, not in the card-only editor or `configuration.yaml`. If editing the whole dashboard YAML, this object belongs as one entry under its existing `views:` list; preserve other views.
+
+```yaml
+title: WhatsMiner
+path: whatsminer
+type: panel
+cards:
+  - type: custom:ha-whatsminer-heatmap-card
+    title: M60VK2A chip temperatures
+    auto_discover: true
+    layout: m60vk2a
+    compact: true
+    min_temperature: 60
+    max_temperature: 100
+```
+
+The same view is available in [examples/m60vk2a-panel.yaml](examples/m60vk2a-panel.yaml). A full-width view at normal browser zoom is the intended setup for a 1080p desktop display with three boards. Available height, browser zoom, custom themes and additional discovered boards affect whether the entire card fits without vertical scrolling. On phones, scrolling may still be necessary and the 22-column physical arrangement has smaller cells. Use explicit `entities` instead of automatic discovery if other miners would add extra boards.
+
+Chip temperatures and other chip metrics are hourly snapshots by default from version 0.5.4. The per-board **Chip data** timestamp shows the last successful WEB read and stays unchanged between reads. API telemetry continues at its configured frequency. Adjust **Chip data polling interval (seconds)** in the integration WEB options if needed.
+
+After upgrading, restart Home Assistant and hard-refresh the browser so it loads the new card JavaScript. The resource URL stays `/ha-whatsminer/ha-whatsminer-heatmap-card.js`.
 
 ### Manual layout
 
@@ -126,3 +157,4 @@ Manual `layouts` continue to use the supplied source IDs without applying the pr
 - **Unknown layout**: use the supported `layout: m60vk2a` value with card version 0.5.3 or later, then reload the browser after updating. Remove `layout` to return to the logical grid, or use a manual `layouts` matrix instead.
 - **Both layout options specified**: keep either the named `layout` preset or manual `layouts`, not both.
 - **M60VK2A mapping warning**: this is intentional. The preset's `Cn → U(n+1)` correspondence has not been verified; selecting the preset does not establish that correspondence or turn it into a manufacturer drawing.
+- **Only part of a board is visible or the card occupies a narrow column**: use the full-width Panel view above with card version 0.5.4 or later and `compact: true`. Compact cells cannot change the surrounding dashboard view layout. Reload the browser after updating.

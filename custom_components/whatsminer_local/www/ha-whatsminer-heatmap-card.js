@@ -1,4 +1,4 @@
-/* HA-WhatsMiner 0.5.3 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.5.4 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);
@@ -99,6 +99,11 @@ const css = `
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.title{font-size:20px;font-weight:650}.subtitle{font-size:12px;color:var(--secondary-text-color,#a5b4c8);margin-top:6px}.modes{display:flex;gap:5px}.mode{border:1px solid var(--divider-color,#40516a);border-radius:8px;padding:7px 10px;background:transparent;color:inherit;cursor:pointer;font-size:12px}.mode.active{background:#246475;color:white;border-color:#51c6c9}.board{margin-top:22px}.boardhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}.boardname{font-weight:650}.stats{font-size:12px;color:var(--secondary-text-color,#a5b4c8)}.placement{font-size:11px;margin:7px 0 10px;color:var(--secondary-text-color,#a5b4c8)}.scroll{overflow-x:auto;padding-bottom:5px}.grid{display:grid;gap:5px;min-width:min-content}.chip{border:1px solid #ffffff24;color:#fff;text-shadow:0 1px 2px #0008;min-width:46px;min-height:51px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;font:inherit;cursor:pointer;padding:6px 3px}.chip:hover,.chip:focus-visible{outline:2px solid var(--primary-text-color,#fff);outline-offset:1px}.chipid{font-size:10px;opacity:.88}.temp{font-size:12px;font-weight:700}.missing{background:repeating-linear-gradient(45deg,#536071,#536071 4px,#424e60 4px,#424e60 8px)!important}.legend{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--secondary-text-color,#a5b4c8);margin-top:20px;flex-wrap:wrap}.bar{width:140px;height:7px;border-radius:5px;background:linear-gradient(90deg,hsl(210 72% 44%),hsl(150 72% 44%),hsl(70 72% 44%),hsl(0 72% 44%))}.bar.delta{background:linear-gradient(90deg,hsl(215 65% 44%),hsl(150 68% 42%),hsl(0 68% 42%))}.message{padding:16px 0;color:var(--secondary-text-color,#a5b4c8)}.details{padding:10px;margin-top:12px;border-radius:8px;background:#8097b018;font-size:13px;min-height:36px}.note{margin-top:9px;color:var(--secondary-text-color,#a5b4c8);font-size:11px;line-height:1.5}.demo{padding:7px 10px;background:#8b5c15;color:white;border-radius:7px;font-size:11px;margin-bottom:14px}
 `;
 
+const compactCss = `
+:host{min-width:0}ha-card{min-width:0;--chip-height:51px;--board-gap:24px}.boards{min-width:0}.board{min-width:0}.physical{min-width:0;max-width:100%}.physical .grid{min-width:0}.physical .chip{min-width:0;min-height:0;height:var(--chip-height);overflow:hidden;padding:0;gap:0}.physical .chipid,.physical .temp{white-space:nowrap}.mapping-warning{font-size:11px;color:var(--secondary-text-color,#a5b4c8);margin-top:8px}.disclosure{margin-top:8px;font-size:11px;color:var(--secondary-text-color,#a5b4c8)}.disclosure summary{cursor:pointer}.disclosure .note{margin-top:5px}.compact{padding:10px;line-height:1.2;--chip-height:clamp(24px,calc((100dvh - 440px) / var(--heatmap-total-rows,24)),32px);--board-gap:8px}.compact header{gap:6px}.compact .title{font-size:16px}.compact .subtitle{display:none}.compact .mode{padding:5px 8px;font-size:11px}.compact .boards{display:grid;gap:8px;margin-top:8px}.compact .board{margin-top:0}.compact .boardhead{line-height:14px;flex-wrap:nowrap;align-items:center;gap:8px;margin-bottom:4px;min-width:0}.compact .boardname{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.compact .stats{font-size:11px;white-space:nowrap;flex-shrink:0}.compact .board>.placement{display:none}.compact .grid{gap:2px}.compact .chipid{font-size:9px;line-height:10px}.compact .temp{font-size:11px;line-height:12px}.compact .scroll{padding-bottom:0}.compact .updated{font-size:10px;margin-top:2px;line-height:12px}.compact .mapping-warning{margin-top:5px;line-height:14px}.compact .legend{margin-top:7px;gap:6px;line-height:14px}.compact .details{font-size:11px;padding:4px 6px;min-height:22px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.compact .disclosure{margin-top:5px}.compact .disclosure summary{line-height:16px}
+@media(max-width:700px){.compact .boardhead{flex-wrap:wrap;gap:2px}.compact .boardname{flex-basis:100%}.compact .title{font-size:14px}.compact .physical .chipid{font-size:8px}.compact .physical .temp{font-size:9px}}
+`;
+
 export class HAWhatsminerHeatmapCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this._mode = "absolute"; }
   static getStubConfig() {
@@ -107,6 +112,8 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
   setConfig(config) {
     if (config.layout !== undefined && config.layout !== "m60vk2a") throw new Error("Unknown layout profile. Use m60vk2a, or omit layout for automatic placement.");
     if (config.layout && config.layouts) throw new Error("Use either layout or layouts, not both.");
+    const compact = config.compact === undefined ? config.layout === "m60vk2a" : config.compact;
+    if (typeof compact !== "boolean") throw new Error("compact must be true or false");
     const entities = config.entities || (config.entity ? [config.entity] : []);
     const autoDiscover = config.auto_discover ?? (!config.entities && !config.entity);
     if (typeof autoDiscover !== "boolean") throw new Error("auto_discover must be true or false");
@@ -123,7 +130,7 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
         layoutCells([], rows, columns);
       }
     }
-    this._config = { ...config, entities, auto_discover: autoDiscover, min_temperature: min, max_temperature: max, columns };
+    this._config = { ...config, compact, entities, auto_discover: autoDiscover, min_temperature: min, max_temperature: max, columns };
     this._discovered = new Set();
     this._previous = undefined;
     this._render();
@@ -159,8 +166,8 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     const cfg = this._config;
     const root = this.shadowRoot;
     root.replaceChildren();
-    const style = this._node("style"); style.textContent = css; root.append(style);
-    const card = this._node("ha-card"); root.append(card);
+    const style = this._node("style"); style.textContent = css + compactCss; root.append(style);
+    const card = this._node("ha-card", cfg.compact ? "compact" : ""); root.append(card);
     if (cfg.demo) card.append(this._node("div", "demo", "DEMO · synthetic data, no miner connection"));
     const header = this._node("header");
     const heading = this._node("div"); heading.append(this._node("div", "title", cfg.title || "HA-WhatsMiner · chip heatmap"));
@@ -175,10 +182,14 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     header.append(modes); card.append(header);
     const details = this._node("div", "details", "Select a chip to view its temperature, median deviation and available telemetry.");
     const entities = this._entityIds();
+    card.style.setProperty("--heatmap-total-rows", String(Math.max(8, entities.length * 8)));
+    if (cfg.layout === "m60vk2a") card.append(this._node("div", "mapping-warning", "M60VK2A · Unverified mapping: WEB Cn → PCB U(n+1). U labels and some positions are assumed."));
+    const boards = this._node("div", "boards"); card.append(boards);
+    let hasRawTelemetry = false;
     if (!entities.length) card.append(this._node("div", "message", "No web chip maps found. Enable web chip data in HA-WhatsMiner and check that Board N web chip map sensors are enabled and available."));
     for (const id of entities) {
       const state = this._hass.states[id];
-      const board = this._node("section", "board"); card.append(board);
+      const board = this._node("section", "board"); boards.append(board);
       if (!state) {
         board.append(this._node("div", "message", `${id}: entity does not exist. Replace example entity IDs with actual Board N web chip map sensors, or remove entity/entities and use auto_discover: true.`)); continue;
       }
@@ -190,20 +201,16 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       const reference = median(values);
       const slot = state.attributes.slot;
       const boardHead = this._node("div", "boardhead");
-      boardHead.append(this._node("div", "boardname", cfg.auto_discover && state.attributes.friendly_name ? state.attributes.friendly_name : `Board · Slot ${slot ?? "?"}`));
+      const boardName = this._node("div", "boardname", cfg.auto_discover && state.attributes.friendly_name ? state.attributes.friendly_name : `Board · Slot ${slot ?? "?"}`);
+      boardName.title = boardName.textContent;
+      boardHead.append(boardName);
       boardHead.append(this._node("div", "stats", values.length ? `min ${Math.min(...values).toFixed(1)}° · avg ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}° · max ${Math.max(...values).toFixed(1)}° · ${values.length}/${chips.length}` : "No readings"));
       board.append(boardHead);
-      if (chips.some(chip => Object.hasOwn(chip, "voltage_raw") || Object.hasOwn(chip, "frequency_raw"))) {
-        board.append(this._node("div", "note", "Voltage and frequency retain raw firmware values; their units/scales are unverified. Counters are snapshots; pct/x meanings are firmware-specific."));
-      }
+      hasRawTelemetry ||= chips.some(chip => Object.hasOwn(chip, "voltage_raw") || Object.hasOwn(chip, "frequency_raw"));
       let placement;
       try { placement = boardPlacement(chips, cfg, slot); }
       catch (error) { board.append(this._node("div", "message", error.message)); continue; }
       board.append(this._node("div", "placement", placement.kind));
-      if (placement.warning) {
-        board.append(this._node("div", "note", placement.warning));
-        board.append(this._node("div", "placement", "Power terminals: left · Signal connector: right · Block alignment and spacing are schematic. PCB labels marked * are assumed."));
-      }
       const grid = this._grid(placement.cells, placement.columns, reference, slot, details, placement.spacerRows);
       board.append(grid);
       if (placement.remaining.length) {
@@ -213,22 +220,32 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       }
       if (state.attributes.updated_at) {
         const date = new Date(state.attributes.updated_at);
-        if (!Number.isNaN(date.valueOf())) board.append(this._node("div", "note", `Updated ${date.toLocaleString("en-GB")}`));
+        if (!Number.isNaN(date.valueOf())) board.append(this._node("div", "note updated", `Chip data: ${date.toLocaleString("en-GB")}`));
       }
     }
     const legend = this._node("div", "legend");
     const left = this._mode === "absolute" ? `${cfg.min_temperature}°C` : "−15°C";
     const right = this._mode === "absolute" ? `${cfg.max_temperature}°C` : "+15°C";
     legend.append(this._node("span", "", left), this._node("div", `bar ${this._mode === "delta" ? "delta" : ""}`), this._node("span", "", right), this._node("span", "", "▨ No reading"));
-    card.append(legend, details, this._node("div", "note", "The color scale compares readings; it is not a temperature limit. Check the placement label before interpreting neighboring cells as physical neighbors."));
+    card.append(legend, details);
+    const disclosure = this._node("details", "disclosure");
+    disclosure.append(this._node("summary", "", "Layout and telemetry notes"));
+    if (cfg.layout === "m60vk2a") {
+      disclosure.append(this._node("div", "note", "Unverified mapping: C0 → U1, C1 → U2, through C171 → U172. Some PCB positions are inferred from the photographed numbering pattern."));
+      disclosure.append(this._node("div", "note", "Power terminals: left · Signal connector: right · Block alignment and spacing are schematic. Select a U label to see its original WEB chip ID."));
+    }
+    if (hasRawTelemetry) disclosure.append(this._node("div", "note", "Voltage and frequency retain raw firmware values; their units/scales are unverified. Counters are snapshots; pct/x meanings are firmware-specific."));
+    disclosure.append(this._node("div", "note", "The color scale compares readings; it is not a temperature limit. Check the placement label before interpreting neighboring cells as physical neighbors."));
+    card.append(disclosure);
   }
   _grid(cells, columns, reference, slot, details, spacerRows = []) {
-    const scroll = this._node("div", "scroll"), grid = this._node("div", "grid");
-    grid.style.gridTemplateColumns = `repeat(${columns}, minmax(46px, 1fr))`;
+    const physical = this._config.layout === "m60vk2a";
+    const scroll = this._node("div", physical ? "scroll physical" : "scroll"), grid = this._node("div", "grid");
+    grid.style.gridTemplateColumns = `repeat(${columns}, minmax(${physical ? "0" : "46px"}, 1fr))`;
     if (spacerRows.length) {
       const rows = Math.max(...cells.map(chip => chip.row)) + 1;
       grid.style.gridTemplateRows = Array.from({ length: rows }, (_, row) =>
-        spacerRows.includes(row) ? "24px" : "minmax(51px, auto)").join(" ");
+        spacerRows.includes(row) ? "var(--board-gap)" : "var(--chip-height)").join(" ");
     }
     scroll.append(grid);
     for (const chip of cells) {
@@ -238,13 +255,12 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       cell.type = "button";
       cell.style.gridRow = String(chip.row + 1); cell.style.gridColumn = String(chip.column + 1);
       cell.style.background = chipColor(value, this._config.min_temperature, this._config.max_temperature, this._mode, reference);
-      cell.append(this._node("span", "chipid", chip.id), this._node("span", "temp", tempText));
-      if (chip.pcbLabel) cell.append(this._node("span", "chipid pcbid", `${chip.pcbLabel}*`));
+      cell.append(this._node("span", "chipid", chip.pcbLabel || chip.id), this._node("span", "temp", tempText));
       const delta = value === null || reference === null ? "—" : `${value - reference >= 0 ? "+" : ""}${(value - reference).toFixed(1)}°C`;
       const telemetry = chipDetails(chip);
       cell.title = `Slot ${slot} · ${chip.id}${chip.pcbLabel ? ` · assumed PCB ${chip.pcbLabel}` : ""} · ${tempText} · Δ ${delta}${telemetry ? ` · ${telemetry}` : ""}`;
       cell.setAttribute("aria-label", cell.title);
-      cell.onclick = () => { details.textContent = cell.title; };
+      cell.onclick = () => { details.textContent = cell.title; details.title = cell.title; };
       grid.append(cell);
     }
     return scroll;

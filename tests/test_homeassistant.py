@@ -173,12 +173,102 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(maps), 1)
         self.assertEqual(maps[0].attributes['chips'][0]['id'], 'U1')
         coordinator.web_client.read_chips.side_effect = ChipWebError('web_auth_required')
+        coordinator._web_next_poll = 0
         await coordinator.async_refresh()
         await self.hass.async_block_till_done()
         self.assertEqual(coordinator.data['power-realtime'], 3268)
         self.assertEqual(coordinator.data['chip-web-status'], 'web_auth_required')
         self.assertEqual(self.hass.states.get(maps[0].entity_id).state, 'unavailable')
         self.assertEqual(coordinator.chip_boards, [])
+
+    async def test_chip_polling_is_hourly_while_api_and_cached_metrics_continue(self):
+        import copy
+        clock = [100.0]
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 73,
+                                         'voltage_raw': 275, 'errors': 3}]}]
+        with patch('custom_components.whatsminer_local.coordinator.monotonic', side_effect=lambda: clock[0]), \
+             patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips',
+                   new=AsyncMock(return_value=readings)) as read_chips:
+            entry = await self.add_entry(extra={'web_chips': True})
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            self.assertEqual(coordinator.web_interval, 3600)
+            self.assertEqual(coordinator.update_interval.total_seconds(), 30)
+            read_chips.assert_awaited_once()
+            first_update = coordinator.chip_updated_at
+            self.assertIsNotNone(first_update)
+            initial_api_reads = self.client.read_snapshot.await_count
+            board = next(s for s in self.hass.states.async_all('sensor')
+                         if s.attributes.get('source') == 'web')
+            snapshot = copy.deepcopy(SNAPSHOT)
+            snapshot['status']['summary']['power-realtime'] = 2800
+            self.client.read_snapshot.return_value = snapshot
+            read_chips.return_value = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 79,
+                                                            'voltage_raw': 281, 'errors': 4}]}]
+            for elapsed in (30, 1800, 3599):
+                clock[0] = 100 + elapsed
+                await coordinator.async_refresh()
+                await self.hass.async_block_till_done()
+                self.assertEqual(coordinator.data['power-realtime'], 2800)
+                self.assertEqual(coordinator.data['web-chip-0-C0'], 73)
+                self.assertEqual(coordinator.chip_updated_at, first_update)
+                state = self.hass.states.get(board.entity_id)
+                self.assertEqual(state.attributes['updated_at'], first_update)
+                self.assertEqual(dict(state.attributes['chips'][0]), readings[0]['chips'][0])
+                read_chips.assert_awaited_once()
+            self.assertEqual(self.client.read_snapshot.await_count, initial_api_reads + 3)
+            clock[0] = 3700
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            self.assertEqual(read_chips.await_count, 2)
+            self.assertEqual(coordinator.data['web-chip-0-C0'], 79)
+            self.assertEqual(self.hass.states.get(board.entity_id).attributes['chips'][0]['errors'], 4)
+            self.assertNotEqual(coordinator.chip_updated_at, first_update)
+
+    async def test_failed_hourly_chip_poll_waits_before_retry_and_recovers(self):
+        from custom_components.whatsminer_local.chip_web import ChipWebError
+        clock = [100.0]
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 73}]}]
+        with patch('custom_components.whatsminer_local.coordinator.monotonic', side_effect=lambda: clock[0]), \
+             patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips',
+                   new=AsyncMock(return_value=readings)) as read_chips:
+            entry = await self.add_entry(extra={'web_chips': True})
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            clock[0] = 3700
+            read_chips.side_effect = ChipWebError('web_auth_required')
+            await coordinator.async_refresh()
+            self.assertEqual(read_chips.await_count, 2)
+            self.assertTrue(coordinator.last_update_success)
+            self.assertEqual(coordinator.data['chip-web-status'], 'web_auth_required')
+            self.assertNotIn('web-chip-0-C0', coordinator.data)
+            self.assertEqual(coordinator.chip_boards, [])
+            self.assertIsNone(coordinator.chip_updated_at)
+            read_chips.side_effect = None
+            clock[0] = 7299
+            await coordinator.async_refresh()
+            self.assertEqual(read_chips.await_count, 2)
+            self.assertEqual(coordinator.data['chip-web-status'], 'web_auth_required')
+            self.assertEqual(coordinator.data['power-realtime'], 3268)
+            clock[0] = 7300
+            await coordinator.async_refresh()
+            self.assertEqual(read_chips.await_count, 3)
+            self.assertEqual(coordinator.data['chip-web-status'], 'ok')
+            self.assertEqual(coordinator.data['web-chip-0-C0'], 73)
+            self.assertIsNotNone(coordinator.chip_updated_at)
+
+    async def test_chip_interval_option_is_validated_and_does_not_change_api_interval(self):
+        import voluptuous as vol
+        from custom_components.whatsminer_local.config_flow import web_schema
+        credentials = {'web_username': 'admin', 'web_password': 'web-secret'}
+        self.assertEqual(web_schema({})(credentials)['web_scan_interval'], 3600)
+        for value in (59, 86401):
+            with self.assertRaises(vol.Invalid):
+                web_schema({})({**credentials, 'web_scan_interval': value})
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips',
+                   new=AsyncMock(return_value=[])):
+            entry = await self.add_entry(extra={'web_chips': True, 'web_scan_interval': 60})
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            self.assertEqual(coordinator.web_interval, 60)
+            self.assertEqual(coordinator.update_interval.total_seconds(), 30)
 
     async def test_web_session_is_isolated_and_closed_on_unload(self):
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -227,14 +317,16 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             self.client.read_snapshot.side_effect = None
             flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
                 'web_username': 'new-user', 'web_password': 'new-web-password',
-                'web_verify_ssl': False,
+                'web_verify_ssl': False, 'web_scan_interval': 7200,
             })
             self.assertEqual(flow['type'], 'create_entry')
             self.assertEqual(entry.options['password'], 'new-api-password')
             self.assertEqual(entry.options['web_password'], 'new-web-password')
+            self.assertEqual(entry.options['web_scan_interval'], 7200)
             self.assertNotIn('web_auth', entry.options)
             self.assertNotIn('web_cookie', entry.options)
             await self.hass.async_block_till_done()
+            self.assertEqual(self.hass.data[DOMAIN][entry.entry_id].web_interval, 7200)
             self.client.set_power.assert_not_awaited()
             self.client.set_power_percent.assert_not_awaited()
 
@@ -308,6 +400,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             # A valid non-temperature record is still available in the board map.
             readings[0]['chips'][0] = {'id': 'C0', 'temperature': None, 'errors': 0}
             coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            coordinator._web_next_poll = 0
             await coordinator.async_refresh()
             await self.hass.async_block_till_done()
             self.assertEqual(self.hass.states.get(board.entity_id).state, 'unknown')
@@ -316,6 +409,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('voltage_raw', chip.attributes)
             self.assertEqual(chip.state, 'unavailable')
             coordinator.web_client.read_chips = AsyncMock(side_effect=ChipWebError('web_auth_required'))
+            coordinator._web_next_poll = 0
             await coordinator.async_refresh()
             await self.hass.async_block_till_done()
             self.assertEqual(self.hass.states.get(board.entity_id).state, 'unavailable')
@@ -325,7 +419,7 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         from custom_components.whatsminer_local.config_flow import connection_schema, web_schema
         self.assertNotIn('port', {str(key) for key in connection_schema({}).schema})
         self.assertEqual({str(key) for key in web_schema({}).schema},
-                         {'web_username', 'web_password', 'web_verify_ssl'})
+                         {'web_username', 'web_password', 'web_verify_ssl', 'web_scan_interval'})
         flow = await self.hass.config_entries.flow.async_init(DOMAIN, context={'source': 'user'})
         flow = await self.hass.config_entries.flow.async_configure(flow['flow_id'], {
             'host': '192.0.2.10', 'scan_interval': 30, 'enable_control': False, 'web_chips': True})

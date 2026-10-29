@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.3**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.4**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -17,9 +17,10 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - `set.miner.power_percent` control and a local `normal` / `fast` adjustment-mode selector.
 - Chip frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values in map attributes and chip details.
 - Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
-- Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials and certificate verification are configured.
+- Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials, certificate verification and the chip polling interval are configured.
 - A heatmap card with automatic board discovery, chip IDs, temperatures, statistics, median deviations and explicit board layouts.
-- An opt-in M60VK2A layout reconstructed from board photographs, with visible unverified WEB-to-PCB mapping labels.
+- An opt-in M60VK2A layout reconstructed from board photographs, with compact U-only cells, a full-width panel example and a visible unverified WEB-to-PCB mapping notice.
+- Independent chip-data polling: once per hour by default, while API telemetry keeps its configured interval.
 - One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
 - Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
 
@@ -37,6 +38,10 @@ Start with power control and web chip data disabled, then compare API telemetry 
 
 Register the card once at `/ha-whatsminer/ha-whatsminer-heatmap-card.js` as a JavaScript module. This URL stays the same across releases. After an integration update and HA restart, reload the dashboard page to load the updated card. A version query parameter is not required. Use `auto_discover: true` in the card configuration to find board maps without entering entity IDs; see [HEATMAP.md](HEATMAP.md).
 
+For three M60VK2A boards on a desktop monitor, use `layout: m60vk2a` with the default compact display and a dedicated full-width Panel view. See [the complete view example](examples/m60vk2a-panel.yaml). The chip cells show U labels; their original WEB C IDs remain available in tooltips and selected-chip details.
+
+WEB chip temperatures and all other per-chip metrics now update every **3600 seconds** by default, including existing configurations without a chip interval. The first read after setup/reload is immediate. API telemetry continues at its existing interval, normally 30 seconds. Change **Chip data polling interval (seconds)** on the WEB step of Configure if needed; it accepts 60–86400 seconds. The last chip data and timestamp remain unchanged between successful reads; HeatMap is therefore an hourly snapshot by default.
+
 ### Manual installation and upgrades
 
 Place `custom_components/whatsminer_local` at `/config/custom_components/whatsminer_local`, then restart Home Assistant. Replace the integration directory when upgrading manually so removed translation files are not left behind. The internal domain remains `whatsminer_local` to preserve integration identity.
@@ -50,7 +55,7 @@ Open **Settings → Devices & services → HA-WhatsMiner → Configure** (the op
 **The first screen is only Connection settings. Select Submit to continue; it does not finish the options flow when power control or web data is enabled.** Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password field preserves its previous value.
 
 - The **API password** and account are used for TCP power commands.
-- The **Web username/password** are used for LuCI chip data; HTTPS, port 443, the page path and LuCI login are automatic. Only web credentials and certificate verification are shown in the web form.
+- The **Web username/password** are used for LuCI chip data; HTTPS, port 443, the page path and LuCI login are automatic. Web credentials, certificate verification and the chip-data polling interval are shown in the web form.
 - Updating stored connection credentials does not change the account password on the miner itself. Device account passwords are managed through WhatsminerTool. The API account `super` has its own password: do not assume the web `admin` password matches it.
 - When the host remains unchanged, option changes can be saved while the miner is unreachable. A changed host is still checked to avoid accidentally attaching an existing entry to another miner.
 - Saving options reloads the integration without issuing power commands.

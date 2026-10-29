@@ -143,18 +143,24 @@ test('Explicit selection stays scoped and invalid mixed discovery configuration 
   assert.throws(() => card.setConfig({auto_discover: false}), /Specify web chip map/);
 });
 
-test('Opt-in M60VK2A card preserves source readings and shows assumed PCB labels with an unverified mapping warning', () => {
+test('M60VK2A cells show one PCB label while preserving source readings and the mapping warning', () => {
   const card = makeCard([{id: 'C0', temperature: 73, voltage_raw: 275, errors: 3},
                          {id: 'C171', temperature: 81, crc_errors: 0}], {layout: 'm60vk2a'});
   const root = card.shadowRoot;
   assert.equal(root.querySelectorAll('.chip').length, 172);
   assert.equal(root.querySelectorAll('.missing').length, 170);
   const cells = [...root.querySelectorAll('.chip')];
-  const zero = cells.find(cell => cell.querySelector('.chipid').textContent === 'C0');
-  const last = cells.find(cell => cell.querySelector('.chipid').textContent === 'C171');
+  const zero = cells.find(cell => cell.querySelector('.chipid').textContent === 'U1');
+  const last = cells.find(cell => cell.querySelector('.chipid').textContent === 'U172');
   assert.ok(zero);
   assert.ok(last);
-  assert.match(zero.textContent, /C0.*U1/s);
+  for (const cell of cells) {
+    assert.equal(cell.querySelectorAll('.chipid').length, 1);
+    assert.match(cell.querySelector('.chipid').textContent, /^U[1-9][0-9]*$/);
+    assert.ok(!cell.textContent.includes('*'));
+  }
+  assert.ok(!zero.textContent.includes('C0'));
+  assert.match(zero.title, /C0/);
   assert.equal(zero.style.gridRow, '6');
   assert.equal(zero.style.gridColumn, '22');
   assert.equal(last.style.gridRow, '1');
@@ -162,9 +168,11 @@ test('Opt-in M60VK2A card preserves source readings and shows assumed PCB labels
   assert.match(root.querySelector('.placement').textContent, /unverified/i);
   assert.match(root.textContent, /C0\s*(?:→|->|=|to)\s*U1/);
   assert.match(root.textContent, /unverified/i);
-  const tracks = root.querySelector('.grid').style.gridTemplateRows.match(/minmax\([^)]+\)|[\d.]+px/g);
+  assert.match(root.querySelector('.grid').style.gridTemplateColumns, /repeat\(22, minmax\(0(?:px)?, 1fr\)\)/);
+  const tracks = root.querySelector('.grid').style.gridTemplateRows.split(/\s+/);
   assert.equal(tracks.length, 9);
-  assert.equal(tracks[4], '24px');
+  assert.equal(tracks.filter(track => track === 'var(--chip-height)').length, 8);
+  assert.equal(tracks[4], 'var(--board-gap)');
   zero.click();
   assert.match(root.querySelector('.details').textContent, /C0/);
   assert.match(root.querySelector('.details').textContent, /73\.0/);
@@ -184,4 +192,46 @@ test('Physical candidate is opt-in and invalid profile configuration is rejected
   assert.ok(!Object.hasOwn(card.constructor.getStubConfig(), 'layout'));
   assert.throws(() => card.setConfig({entity: id, layout: 'unknown-board'}));
   assert.throws(() => card.setConfig({entity: id, layout: 'm60vk2a', layouts: {'0': [['C0']]}}));
+});
+
+
+test('Three compact M60VK2A boards retain all readings with one set of explanatory notes', () => {
+  const card = autoCard({
+    'sensor.board_0': boardState(0),
+    'sensor.board_1': boardState(1),
+    'sensor.board_2': boardState(2),
+  }, {auto_discover: true, layout: 'm60vk2a'});
+  const root = card.shadowRoot;
+  assert.ok(root.querySelector('ha-card.compact'));
+  assert.equal(root.querySelectorAll('.boards > .board').length, 3);
+  assert.equal(root.querySelectorAll('.chip').length, 516);
+  assert.equal(root.querySelectorAll('.chipid').length, 516);
+  assert.equal(root.querySelectorAll('.mapping-warning').length, 1);
+  assert.match(root.querySelector('.mapping-warning').textContent, /unverified/i);
+  assert.equal(root.querySelectorAll('details.disclosure').length, 1);
+  assert.equal(root.querySelector('details.disclosure').open, false);
+  assert.equal(root.querySelector('details.disclosure summary').textContent, 'Layout and telemetry notes');
+  for (const board of root.querySelectorAll('.board')) {
+    const cells = [...board.querySelectorAll('.chip')];
+    assert.equal(cells.length, 172);
+    assert.deepEqual(new Set(cells.map(cell => cell.querySelector('.chipid').textContent)),
+      new Set(Array.from({length: 172}, (_, index) => `U${index + 1}`)));
+    assert.ok(cells.every(cell => cell.querySelector('.temp').textContent === '73.0°'));
+    assert.equal(board.querySelectorAll('.mapping-warning, details.disclosure').length, 0);
+  }
+});
+
+test('Compact sizing can be disabled without changing chip identity or telemetry', () => {
+  const card = makeCard([{id: 'C0', temperature: 73, errors: 0}], {layout: 'm60vk2a', compact: false});
+  const root = card.shadowRoot;
+  assert.ok(!root.querySelector('ha-card').classList.contains('compact'));
+  const cell = [...root.querySelectorAll('.chip')].find(chip => chip.querySelector('.chipid').textContent === 'U1');
+  assert.ok(cell);
+  cell.click();
+  assert.match(root.querySelector('.details').textContent, /C0.*assumed PCB U1.*Errors: 0/);
+  card.setConfig({entity: id, layout: 'm60vk2a', compact: true});
+  assert.ok(card.shadowRoot.querySelector('ha-card.compact'));
+  for (const compact of ['true', 1, null, {}, []]) {
+    assert.throws(() => card.setConfig({entity: id, layout: 'm60vk2a', compact}), /compact must be true or false/);
+  }
 });

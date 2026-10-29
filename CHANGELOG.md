@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4
+
+- Read WEB chip data once per hour by default, independently of the existing API interval, including existing entries. Add a 60–86400-second chip polling option; keep the last measurement timestamp between reads and space retries after failures. Setup and reload still read immediately.
+- Make M60VK2A cells fluid and compact by default, showing only U labels and temperatures. Preserve source C IDs and all telemetry in tooltips/details and keep a visible unverified mapping notice.
+- Consolidate layout and telemetry notes, show the last chip measurement time and provide a full-width Panel view example for three boards on desktop monitors. Keep the permanent JavaScript URL.
+- Pass 82 automated tests (59 Python, 23 JavaScript).
+
 ## 0.5.3
 
 - Add the opt-in `layout: m60vk2a` HeatMap profile reconstructed from supplied PCB photographs: upper 4-by-21 and lower 4-by-22 sections with a central gap.

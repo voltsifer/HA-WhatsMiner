@@ -11,7 +11,7 @@ from .const import (
     ACCOUNTS, CONF_ACCOUNT, CONF_CONTROL, CONF_MAX, CONF_MIN,
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN, CONF_PERCENT_MIN, CONF_PERCENT_MODE,
     DEFAULT_PERCENT_MIN, CONF_WEB_CHIPS, CONF_WEB_USERNAME, CONF_WEB_PASSWORD,
-    CONF_WEB_VERIFY_SSL, LEGACY_WEB_OPTIONS,
+    CONF_WEB_VERIFY_SSL, CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL, LEGACY_WEB_OPTIONS,
 )
 
 
@@ -53,6 +53,7 @@ def control_error(values):
 
 def web_schema(values):
     fields = {
+        vol.Required(CONF_WEB_SCAN_INTERVAL, default=values.get(CONF_WEB_SCAN_INTERVAL, DEFAULT_WEB_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=60, max=86400)),
         vol.Required(CONF_WEB_USERNAME, default=values.get(CONF_WEB_USERNAME) or "admin"): str,
         vol.Required(CONF_WEB_VERIFY_SSL, default=values.get(CONF_WEB_VERIFY_SSL, True)): bool,
     }

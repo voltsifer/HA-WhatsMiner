@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.5.3** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** The user has confirmed live chip retrieval in HAOS on an M60VK2A; this development environment cannot independently reach the private miner.
+Version **0.5.4** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** The user has confirmed live chip retrieval in HAOS on an M60VK2A; this development environment cannot independently reach the private miner.
 
 ## Known endpoint
 
@@ -10,11 +10,17 @@ The supplied endpoint path is:
 https://MINER_IP/cgi-bin/luci/admin/status/btminerapi
 ```
 
-HTTPS, port 443, `/cgi-bin/luci/admin/status/btminerapi` and LuCI authentication are fixed by the integration. The host is taken from the configured miner. Web forms contain only username, password and Verify HTTPS certificate. Protocol, port, GET path, authentication method, JSON Pointer and a session cookie are not user settings.
+HTTPS, port 443, `/cgi-bin/luci/admin/status/btminerapi` and LuCI authentication are fixed by the integration. The host is taken from the configured miner. Web forms contain username, password, Verify HTTPS certificate and Chip data polling interval (seconds). Protocol, port, GET path, authentication method, JSON Pointer and a session cookie are not user settings.
 
 On upgrade, obsolete web keys are removed from both saved data and options. The current web credentials and explicit certificate choice are preserved; a legacy custom endpoint/authentication choice is replaced with the built-in profile. The migration does not send device configuration or power commands.
 
 This private device is not reachable from the development environment. The supplied HTML confirms the expected syslog format; network access and the authenticated session still have to be checked from Home Assistant.
+
+## Independent polling interval
+
+WEB chip data is read every **3600 seconds** by default, including existing entries without `web_scan_interval`. This covers temperatures and all optional chip metrics in the same request. API polling remains independent, normally every 30 seconds. The first WEB read after setup/reload is immediate; later reads occur on the first successful API poll at or after the chip deadline, so the actual interval can be slightly longer than configured.
+
+Change **Chip data polling interval (seconds)** in the WEB step of the integration options to a value from 60 to 86400. Chip readings, metrics and `updated_at` are cached without changing their measurement time between WEB reads. A failed scheduled read invalidates the chip data and waits the configured chip interval before retrying; it does not retry on every API poll. Saving options or reloading the integration starts with a fresh read.
 
 ## Save the response for verification
 

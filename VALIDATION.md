@@ -1,8 +1,8 @@
-# HA-WhatsMiner 0.5.3 validation
+# HA-WhatsMiner 0.5.4 validation
 
 Date: October 29, 2026.
 
-**56 Python tests and 21 JavaScript tests pass: 77 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**59 Python tests and 23 JavaScript tests pass: 82 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
@@ -15,7 +15,7 @@ Date: October 29, 2026.
 | HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
 | Session cleanup | Isolated per-miner cookie session is detached on unload without closing Home Assistant's shared connector |
 | Heatmap calculations | Seven Node.js tests for values, color scales, mapping, missing data and reconstructed profile identities |
-| Heatmap DOM | Fourteen happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
+| Heatmap DOM | Sixteen happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
 | Project language | English labels, documentation and regenerated artwork; CI rejects Cyrillic text and removed language files |
 | Supplied device HTML | Parsed successfully: 3 boards × 172 chips, IDs C0–C171, no missing temperatures; raw private page is not included in the repository |
 | Actual miner operations | The user reports live telemetry and HeatMap working in HAOS; power writes remain unconfirmed |
@@ -64,3 +64,5 @@ Version 0.5.1 adds staged transport errors and a read-only telemetry refresh aft
 Version 0.5.2 adds HeatMap discovery tests for three 172-chip boards without entity IDs, renamed/new/removed/unavailable sources, explicit selection across multiple miners, invalid mixed configuration, empty-state instructions and placeholder-free card picker defaults. Browser code uses only existing HA state data and sends no miner requests.
 
 Version 0.5.3 adds M60VK2A tests for all 172 unique IDs, photographed numbering anchors, the two board sections and reserved central gap, preserved source values and metrics, missing chips, visible mapping uncertainty and assumed PCB references, incompatible/duplicate identity rejection and opt-in configuration. The reconstruction is independently derived from the supplied photographs; no third-party implementation or private photo/serial data is shipped. Tests validate layout completeness and behavior, not the unverified hardware identity correspondence.
+
+Version 0.5.4 adds fake-clock integration tests for hourly WEB reads with continued API polling, preserved chip metrics/timestamps, failure spacing/recovery, interval validation and options reload. DOM tests cover 516 U-only cells across three compact boards, consolidated mapping notes, source C IDs and metrics in details, and the compact opt-out. Full-width 1080p placement is the intended desktop configuration; browser viewport fitting could not be visually verified because Chromium was unavailable.

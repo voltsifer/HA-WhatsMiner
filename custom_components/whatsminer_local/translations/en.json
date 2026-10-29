@@ -26,11 +26,12 @@
       },
       "web": {
         "title": "Individual chip web data",
-        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password.",
+        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password. Chip data is read once per hour by default, independently of the API polling interval. Values and their last successful update time remain unchanged between chip polls.",
         "data": {
           "web_username": "Web username",
           "web_password": "Web password",
-          "web_verify_ssl": "Verify HTTPS certificate"
+          "web_verify_ssl": "Verify HTTPS certificate",
+          "web_scan_interval": "Chip data polling interval (seconds)"
         }
       }
     },
@@ -71,11 +72,12 @@
       },
       "web": {
         "title": "Individual chip web data",
-        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password.",
+        "description": "Chip data uses the built-in LuCI page over HTTPS on port 443. Enter the web login credentials (usually admin); these do not set the API account password. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Leave the password blank to preserve the stored web password. Chip data is read once per hour by default, independently of the API polling interval. Values and their last successful update time remain unchanged between chip polls.",
         "data": {
           "web_username": "Web username",
           "web_password": "Web password",
-          "web_verify_ssl": "Verify HTTPS certificate"
+          "web_verify_ssl": "Verify HTTPS certificate",
+          "web_scan_interval": "Chip data polling interval (seconds)"
         }
       }
     },
