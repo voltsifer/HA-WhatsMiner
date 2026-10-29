@@ -23,6 +23,18 @@ SNAPSHOT = {
 
 
 class TestValues(unittest.TestCase):
+    def test_device_error_reason_is_bounded_and_redacted(self):
+        reason = api.safe_api_reason('Unsupported mode; password=secret token="opaque" salt=salty', ('secret', 'opaque', 'salty'))
+        self.assertIn('Unsupported mode', reason)
+        for value in ('secret', 'opaque', 'salty'):
+            self.assertNotIn(value, reason)
+        self.assertEqual(len(api.safe_api_reason('x' * 500)), 300)
+
+    def test_device_error_dictionary_uses_only_explanation(self):
+        self.assertEqual(api.safe_api_reason({'reason': 'Tuning is incomplete', 'password': 'secret'}), 'Tuning is incomplete')
+        self.assertIsNone(api.safe_api_reason({'password': 'secret'}))
+        self.assertIsNone(api.safe_api_reason('failed'))
+
     def test_auth_official_vector(self):
         self.assertEqual(api.make_token('set.miner.pools', 'abcdefg', 'QbVy1Ou3', 2118015), 'mvmqClRR')
 
@@ -110,6 +122,9 @@ class TestProtocol(unittest.IsolatedAsyncioTestCase):
             code = -4 if cmd.startswith('set.') and self.mode == 'denied' else 0
             if self.mode == 'old_setting' and cmd == 'get.miner.setting':
                 code = -2
+            if self.mode == 'percent_rejected' and cmd == 'set.miner.power_percent':
+                code = -1
+                msg = 'Normal adjustment unavailable; password=abcdefg salt=QbVy1Ou3 token=' + request['token']
             response = {'code': code, 'when': 2118015, 'msg': msg, 'desc': cmd}
             if self.mode == 'wrongcmd':
                 response['desc'] = 'other'
@@ -155,6 +170,16 @@ class TestProtocol(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(api.APIError) as ctx:
             await self.client.set_power(2500, 'super', 'password')
         self.assertEqual(ctx.exception.code, -4)
+        self.assertEqual(len(self.requests), 2)
+
+    async def test_percent_failure_keeps_reason_without_credentials_or_retry(self):
+        self.mode = 'percent_rejected'
+        with self.assertRaises(api.APIError) as ctx:
+            await self.client.set_power_percent(80, 'normal', 'super', 'abcdefg')
+        self.assertEqual(ctx.exception.code, -1)
+        self.assertIn('Normal adjustment unavailable', ctx.exception.reason)
+        for secret in ('abcdefg', 'QbVy1Ou3', self.requests[-1]['token']):
+            self.assertNotIn(secret, str(ctx.exception))
         self.assertEqual(len(self.requests), 2)
 
     async def test_bad_responses(self):

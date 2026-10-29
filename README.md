@@ -1,10 +1,10 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.3.0**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.3.1**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
-Power control and API telemetry are implemented. Individual chip temperatures can be read from a LuCI `btminerapi` HTML page, its plain-text log, or a normalized JSON endpoint. The LuCI format is covered by synthetic tests; compatibility with the user's actual firmware response still needs confirmation.
+Power control and API telemetry are implemented. Individual chip temperatures can be read from a LuCI `btminerapi` HTML page, its plain-text log, or a normalized JSON endpoint. The parser has also been checked against a supplied device HTML response: three boards with 172 chips each were read successfully. Live login, power commands and installation on the user's hardware still require device-side validation.
 
 ![Synthetic heatmap example: one board with 172 chips](examples/heatmap-demo.png)
 
@@ -38,6 +38,18 @@ Start with power control and web chip data disabled, then compare API telemetry 
 Place `custom_components/whatsminer_local` at `/config/custom_components/whatsminer_local`, then restart Home Assistant. Replace the integration directory when upgrading manually so removed translation files are not left behind. The internal domain remains `whatsminer_local` to preserve integration identity.
 
 Existing entity IDs and user-customized names are maintained by Home Assistant. Renaming a default display label does not intentionally rename an entity ID or rewrite automations.
+
+## Edit an existing miner
+
+Open **Settings → Devices & services → HA-WhatsMiner → Configure** (the options/gear control on the existing integration entry). Do not add a duplicate miner to change credentials.
+
+Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password or cookie field preserves its previous value.
+
+- The **API password** and account are used for TCP power commands.
+- The **Web username/password** and **Web authentication** are used for chip data. Select **luci** for the supplied LuCI login page; Basic is a different HTTP authentication scheme.
+- Updating stored connection credentials does not change the account password on the miner itself. Device account passwords are managed on the miner or through WhatsminerTool.
+- When the host and API port remain unchanged, option changes can be saved while the miner is unreachable. A changed host or port is still checked to avoid accidentally attaching an existing entry to another miner.
+- Saving options reloads the integration without issuing power commands.
 
 ## Power control
 
@@ -74,6 +86,14 @@ data:
   value: 80
 ```
 
+### Investigate a rejected power percentage command
+
+API code **-1** is a generic miner failure, not a diagnosis. The integration sends the documented object `{percent, mode}` and does not automatically fall back to another mode or retry the write.
+
+The action error now includes the requested percentage/mode and a sanitized firmware explanation when one is returned. The percentage number entity exposes `last_command`, also included in downloaded diagnostics: requested value, adjustment mode, reported miner work mode, tuning flag, status and API failure code. It contains no configured credentials or authentication token.
+
+For `normal` adjustment, check that tuning has finished and that an air-cooled miner is in Normal/Low Power mode. `fast` is an explicitly selected alternative with different stability/performance behavior; it is never selected automatically after a failure. Check active miner protection errors and verify API Write/account permissions as appropriate. Web Basic/LuCI authentication does not control TCP API power-command authentication.
+
 ## Individual chip temperatures
 
 The default web profile uses:
@@ -90,7 +110,7 @@ The integration reads `C<n>` chip records inside `slot:` blocks from the page's 
 
 LuCI credentials are separate from API credentials. Certificate verification is enabled by default. For a trusted local miner with a self-signed certificate, you can explicitly disable **Verify HTTPS certificate** in the web options. This affects only that miner's web requests.
 
-The supplied path is known, but the private device cannot be reached from this development environment. A saved page response is still needed to verify your firmware's exact log shape. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
+The supplied path is known, but the private device cannot be reached from this development environment. A supplied page response has been successfully parsed as three 172-chip boards. Live retrieval from this private device has not been verified. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
 
 ## Heatmap
 

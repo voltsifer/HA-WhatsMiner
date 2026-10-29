@@ -2,6 +2,7 @@
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import CONF_PASSWORD, PERCENTAGE, UnitOfPower
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from .api import APIError, WhatsminerError, validate_power
 from .const import (
@@ -51,7 +52,8 @@ class WhatsminerPower(WhatsminerEntity, NumberEntity):
             except APIError as err:
                 if err.code == -4:
                     raise HomeAssistantError("WhatsMiner denied access: check API Write, account and password") from err
-                raise HomeAssistantError(f"Power command rejected: code {err.code}") from err
+                explanation = f". Miner reported: {err.reason}" if err.reason else ""
+                raise HomeAssistantError(f"Power command rejected: code {err.code}{explanation}") from err
             except WhatsminerError as err:
                 raise HomeAssistantError("No response received. The command may have succeeded; check configured power before retrying") from err
             await self.coordinator.async_request_refresh()
@@ -64,6 +66,7 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
     _attr_native_max_value = 100
     _attr_mode = NumberMode.BOX
     _attr_icon = "mdi:percent"
+    _unrecorded_attributes = frozenset({"last_command"})
 
     def __init__(self, coordinator):
         super().__init__(coordinator, "power-percent", "Set power percentage")
@@ -86,6 +89,7 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
             "adjustment_mode": self.coordinator.percent_mode,
             "volatile": True,
             "reference": "initial_stable_power",
+            "last_command": self.coordinator.last_power_percent_command,
         }
 
     async def async_set_native_value(self, value):
@@ -102,11 +106,35 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
                 raise HomeAssistantError("Wait until frequency tuning has finished")
             if self.native_value == percent:
                 return
+            mode = self.coordinator.percent_mode
+            command = {
+                "percent": percent, "mode": mode,
+                "power_mode": self.coordinator.data.get("power-mode"),
+                "tuning_finished": self.coordinator.data.get("up-freq-finish"),
+                "requested_at": dt_util.utcnow().isoformat(), "status": "sending",
+            }
+            self.coordinator.last_power_percent_command = command
             try:
                 await self.coordinator.client.set_power_percent(
-                    percent, self.coordinator.percent_mode, config[CONF_ACCOUNT], config[CONF_PASSWORD])
+                    percent, mode, config[CONF_ACCOUNT], config[CONF_PASSWORD])
             except APIError as err:
-                raise HomeAssistantError(f"Power percentage command rejected: code {err.code}") from err
+                command.update(status="rejected", api_code=err.code, reason=err.reason)
+                self.async_write_ha_state()
+                explanation = f" Miner reported: {err.reason}." if err.reason else ""
+                hint = ""
+                if err.code == -4:
+                    hint = " Check API Write, the API account and API password; web authentication is separate."
+                elif err.code == -1 and mode == "normal":
+                    hint = (" The API returned a generic failure. Normal adjustment requires completed tuning"
+                            " and Normal/Low Power mode on air-cooled devices. Check the miner work mode"
+                            " and any active protection errors; select fast explicitly if appropriate.")
+                raise HomeAssistantError(
+                    f"Power percentage command rejected: code {err.code}, percent {percent}, mode {mode}."
+                    + explanation + hint) from err
             except WhatsminerError as err:
+                command.update(status="unknown", reason="No response received; the command may have succeeded")
+                self.async_write_ha_state()
                 raise HomeAssistantError("No response received; check the setting before retrying the command") from err
+            command.update(status="accepted")
+            self.async_write_ha_state()
             await self.coordinator.async_request_refresh()

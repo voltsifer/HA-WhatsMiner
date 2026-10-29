@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+- Preserve a bounded, sanitized firmware explanation for rejected API commands instead of showing only the numeric failure code.
+- Include the requested percentage/mode and the latest command result in entity attributes and diagnostics, without credentials.
+- Add guidance for generic percentage-command failures; never automatically switch mode or retry a failed write.
+- Allow existing miner options to be saved without probing an unchanged host/API port, so credentials and web authentication can be repaired while offline.
+- Document the existing Configure flow and separate API credentials from LuCI web credentials.
+- Verify the supplied device HTML using the current parser: three boards with 172 chip readings each. The raw private page is not committed.
+
 ## 0.3.0
 
 - Convert all current project documentation, configuration text, default entity names, errors, card labels and demo artwork to English.

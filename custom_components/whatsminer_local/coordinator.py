@@ -30,6 +30,7 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         self.snapshot = {}
         self.command_lock = asyncio.Lock()
         self.percent_mode = self.config.get(CONF_PERCENT_MODE, "normal")
+        self.last_power_percent_command = None
         self.chip_boards = []
         self.chip_updated_at = None
         self.web_client = None

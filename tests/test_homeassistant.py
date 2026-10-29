@@ -48,10 +48,14 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         await async_setup_component(self.hass, 'homeassistant', {})
 
     async def asyncTearDown(self):
+        await self.hass.async_block_till_done()
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.state == ConfigEntryState.LOADED:
+                await self.hass.config_entries.async_unload(entry.entry_id)
+        await self.hass.async_stop()
         self.patch.stop()
         self.flow_patch.stop()
         self.network_patch.stop()
-        await self.hass.async_stop()
         self.tmp.cleanup()
 
     async def add_entry(self, control=False, extra=None):
@@ -196,3 +200,71 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(client.session.closed)
         self.assertFalse(shared.closed)
         self.assertFalse(shared.connector.closed)
+
+    async def test_existing_options_edit_password_and_web_auth_without_probe(self):
+        from custom_components.whatsminer_local.api import WhatsminerError
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 92}]}]
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
+            entry = await self.add_entry(control=True, extra={
+                'web_chips': True, 'web_protocol': 'https', 'web_port': 443,
+                'web_path': '/cgi-bin/luci/admin/status/btminerapi', 'web_auth': 'basic',
+                'web_username': 'old-user', 'web_password': 'old-web-password',
+            })
+            before = self.client.read_snapshot.await_count
+            self.client.read_snapshot.side_effect = WhatsminerError('offline')
+            flow = await self.hass.config_entries.options.async_init(entry.entry_id)
+            flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
+                'host': '192.0.2.10', 'port': 4433, 'scan_interval': 30,
+                'enable_control': True, 'web_chips': True,
+            })
+            self.assertEqual(flow['step_id'], 'control')
+            flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
+                'account': 'super', 'password': 'new-api-password', 'min_power': 1500, 'max_power': 3500,
+            })
+            self.assertEqual(flow['step_id'], 'web')
+            self.assertEqual(self.client.read_snapshot.await_count, before)
+            # The final save may reload the entry; restore the emulator for that reload.
+            self.client.read_snapshot.side_effect = None
+            flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
+                'web_protocol': 'https', 'web_port': 443,
+                'web_path': '/cgi-bin/luci/admin/status/btminerapi', 'web_json_pointer': '',
+                'web_auth': 'luci', 'web_username': 'new-user', 'web_password': 'new-web-password',
+                'web_verify_ssl': False,
+            })
+            self.assertEqual(flow['type'], 'create_entry')
+            self.assertEqual(entry.options['password'], 'new-api-password')
+            self.assertEqual(entry.options['web_password'], 'new-web-password')
+            self.assertEqual(entry.options['web_auth'], 'luci')
+            await self.hass.async_block_till_done()
+            self.client.set_power.assert_not_awaited()
+            self.client.set_power_percent.assert_not_awaited()
+
+    async def test_percentage_rejection_exposes_context_and_diagnostic(self):
+        entry = await self.add_entry(control=True)
+        entity = next(s for s in self.hass.states.async_all('number') if s.attributes.get('unit_of_measurement') == '%')
+        self.client.set_power_percent.side_effect = APIError(-1, 'Normal adjustment unavailable')
+        with self.assertRaisesRegex(HomeAssistantError, 'code -1, percent 80, mode normal'):
+            await self.hass.services.async_call('number', 'set_value', {
+                'entity_id': entity.entity_id, 'value': 80}, blocking=True)
+        self.client.set_power_percent.assert_awaited_once_with(80, 'normal', 'super', 'secret')
+        last = self.hass.states.get(entity.entity_id).attributes['last_command']
+        self.assertEqual(last['status'], 'rejected')
+        self.assertEqual(last['api_code'], -1)
+        self.assertEqual(last['reason'], 'Normal adjustment unavailable')
+        diagnostics = await async_get_config_entry_diagnostics(self.hass, entry)
+        self.assertEqual(diagnostics['last_power_percent_command']['mode'], 'normal')
+        self.assertNotIn('secret', str(diagnostics))
+
+    async def test_options_still_validate_a_changed_host(self):
+        from custom_components.whatsminer_local.api import WhatsminerError
+        entry = await self.add_entry()
+        self.client.read_snapshot.side_effect = WhatsminerError('offline')
+        before = self.client.read_snapshot.await_count
+        flow = await self.hass.config_entries.options.async_init(entry.entry_id)
+        flow = await self.hass.config_entries.options.async_configure(flow['flow_id'], {
+            'host': '192.0.2.11', 'port': 4433, 'scan_interval': 30,
+            'enable_control': False, 'web_chips': False,
+        })
+        self.assertEqual(flow['errors']['base'], 'cannot_connect')
+        self.assertEqual(self.client.read_snapshot.await_count, before + 1)
+        self.assertEqual(entry.data['host'], '192.0.2.10')

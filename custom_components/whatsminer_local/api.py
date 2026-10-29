@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import math
+import re
 import struct
 import time
 from typing import Any
@@ -18,9 +19,29 @@ class WhatsminerError(Exception):
 
 
 class APIError(WhatsminerError):
-    def __init__(self, code: int) -> None:
+    def __init__(self, code: int, reason: str | None = None) -> None:
         self.code = code
-        super().__init__(f"WhatsMiner API error {code}")
+        self.reason = reason
+        super().__init__(f"WhatsMiner API error {code}" + (f": {reason}" if reason else ""))
+
+
+def safe_api_reason(message: Any, secrets: tuple[str, ...] = ()) -> str | None:
+    """Keep a bounded firmware explanation, never a raw response or credentials."""
+    if isinstance(message, dict):
+        message = next((message[key] for key in ("reason", "error", "message", "msg")
+                        if isinstance(message.get(key), str)), None)
+    if not isinstance(message, str):
+        return None
+    text = " ".join(message.split())
+    if text.lower() in ("", "ok", "fail", "failed", "error"):
+        return None
+    for value in sorted((s for s in secrets if s), key=len, reverse=True):
+        text = text.replace(value, "[redacted]")
+    text = re.sub(
+        r'''(?i)\b(password|passwd|token|salt|cookie|authorization|luci_password)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|\S+)''',
+        r"\1=[redacted]", text,
+    )
+    return text[:300]
 
 
 def make_token(command: str, password: str, salt: str, timestamp: int) -> str:
@@ -33,7 +54,7 @@ class WhatsminerClient:
         self.host, self.port, self.timeout = host, port, timeout
         self._lock = asyncio.Lock()
 
-    async def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _request(self, payload: dict[str, Any], *, secrets: tuple[str, ...] = ()) -> dict[str, Any]:
         writer = None
         try:
             async with asyncio.timeout(self.timeout):
@@ -52,7 +73,7 @@ class WhatsminerClient:
                 if not isinstance(response, dict) or type(response.get("code")) is not int:
                     raise WhatsminerError("Invalid API response")
                 if response["code"] != 0:
-                    raise APIError(response["code"])
+                    raise APIError(response["code"], safe_api_reason(response.get("msg"), secrets))
                 if response.get("desc") not in (None, payload["cmd"]):
                     raise WhatsminerError("Unexpected response command")
                 return response
@@ -99,7 +120,7 @@ class WhatsminerClient:
         # Salt and timestamp are fetched immediately before each explicit write.
         # A timed-out write is ambiguous and MUST NOT be automatically retried.
         async with self._lock:
-            response = await self._request({"cmd": "get.device.info", "param": "salt"})
+            response = await self._request({"cmd": "get.device.info", "param": "salt"}, secrets=(password,))
             msg = response.get("msg")
             salt = msg.get("salt") if isinstance(msg, dict) else None
             if not isinstance(salt, str) or not salt:
@@ -107,10 +128,11 @@ class WhatsminerClient:
             timestamp = response.get("when")
             if type(timestamp) is not int:
                 timestamp = int(time.time())
+            token = make_token(command, password, salt, timestamp)
             await self._request({
                 "cmd": command, "ts": timestamp, "account": account,
-                "token": make_token(command, password, salt, timestamp), "param": param,
-            })
+                "token": token, "param": param,
+            }, secrets=(password, salt, token))
 
 
 def numeric(value: Any) -> float | None:

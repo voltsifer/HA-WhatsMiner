@@ -142,13 +142,19 @@ class WhatsminerOptionsFlow(WebFlowMixin, config_entries.OptionsFlow):
         current = {**self.config_entry.data, **self.config_entry.options}
         errors = {}
         if user_input is not None:
+            user_input[CONF_HOST] = user_input[CONF_HOST].strip().lower()
+            connection_changed = (
+                user_input[CONF_HOST] != current[CONF_HOST].strip().lower()
+                or user_input[CONF_PORT] != current.get(CONF_PORT, DEFAULT_PORT)
+            )
             try:
-                snapshot = await probe(user_input)
-                old = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
-                old_mac = old.snapshot.get("info", {}).get("network", {}).get("mac") if old else None
-                new_mac = snapshot["info"].get("network", {}).get("mac")
-                if old_mac and new_mac and old_mac.lower() != new_mac.lower():
-                    errors["base"] = "different_device"
+                if connection_changed:
+                    snapshot = await probe(user_input)
+                    old = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+                    old_mac = old.snapshot.get("info", {}).get("network", {}).get("mac") if old else None
+                    new_mac = snapshot["info"].get("network", {}).get("mac")
+                    if old_mac and new_mac and old_mac.lower() != new_mac.lower():
+                        errors["base"] = "different_device"
             except (WhatsminerError, AttributeError, KeyError, TypeError):
                 errors["base"] = "cannot_connect"
             if not errors:

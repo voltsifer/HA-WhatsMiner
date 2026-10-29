@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.3.0** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **The actual device response has not yet been captured or verified.**
+Version **0.3.1** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
 
 ## Known endpoint
 
@@ -12,7 +12,7 @@ https://MINER_IP/cgi-bin/luci/admin/status/btminerapi
 
 New web configuration forms prefill HTTPS, port 443 and `/cgi-bin/luci/admin/status/btminerapi`. The host is taken from the configured miner, rather than embedded in source. Existing explicitly configured protocol, port and path values are preserved.
 
-This private device is not reachable from the development environment. A URL identifies where to request data, but does not supply the response body, session or firmware-specific format.
+This private device is not reachable from the development environment. The supplied HTML confirms the expected syslog format; network access and the authenticated session still have to be checked from Home Assistant.
 
 ## Save the response for verification
 
