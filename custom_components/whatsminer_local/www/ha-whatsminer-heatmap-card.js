@@ -1,4 +1,4 @@
-/* HA-WhatsMiner 0.2.0 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.3.0 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);
@@ -30,18 +30,18 @@ export function layoutCells(chips, explicitLayout, columns) {
     explicitLayout.forEach((row, r) => row.forEach((id, c) => {
       if (id === null || id === "") return;
       id = String(id);
-      if (used.has(id)) throw new Error(`Чип ${id} повторяется в схеме`);
+      if (used.has(id)) throw new Error(`Chip ${id} appears more than once in the layout`);
       used.add(id);
       cells.push({ ...(byId.get(id) || { id, temperature: null }), row: r, column: c });
     }));
     const remaining = chips.filter(chip => !used.has(String(chip.id)));
-    return { cells, remaining, kind: "Схема пользователя", columns: Math.max(1, ...explicitLayout.map(row => row.length)) };
+    return { cells, remaining, kind: "User-defined layout", columns: Math.max(1, ...explicitLayout.map(row => row.length)) };
   }
   if (chips.length && chips.every(chip => Number.isInteger(chip.row) && Number.isInteger(chip.column))) {
-    return { cells: chips, remaining: [], kind: "Координаты из WEB · сверьте со схемой платы", columns: Math.max(...chips.map(chip => chip.column)) + 1 };
+    return { cells: chips, remaining: [], kind: "Web coordinates · verify against the board layout", columns: Math.max(...chips.map(chip => chip.column)) + 1 };
   }
   return { cells: chips.map((chip, index) => ({ ...chip, row: Math.floor(index / columns), column: index % columns })),
-    remaining: [], kind: "Условная сетка · физическое расположение не задано", columns };
+    remaining: [], kind: "Logical grid · physical layout not specified", columns };
 }
 
 const css = `
@@ -53,15 +53,15 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this._mode = "absolute"; }
   setConfig(config) {
     const entities = config.entities || (config.entity ? [config.entity] : []);
-    if (!Array.isArray(entities) || !entities.length || entities.some(id => typeof id !== "string" || !id.startsWith("sensor."))) throw new Error("Укажите entity или entities датчиков карты чипов WEB");
+    if (!Array.isArray(entities) || !entities.length || entities.some(id => typeof id !== "string" || !id.startsWith("sensor."))) throw new Error("Specify entity or entities for web chip map sensors");
     const min = config.min_temperature ?? 70, max = config.max_temperature ?? 110;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error("Проверьте границы цветовой шкалы");
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error("Check the color scale limits");
     const columns = config.columns ?? 10;
-    if (!Number.isInteger(columns) || columns < 1 || columns > 128) throw new Error("columns: от 1 до 128");
+    if (!Number.isInteger(columns) || columns < 1 || columns > 128) throw new Error("columns must be between 1 and 128");
     if (config.layouts) {
-      if (typeof config.layouts !== "object" || Array.isArray(config.layouts)) throw new Error("layouts должен быть объектом по номеру слота");
+      if (typeof config.layouts !== "object" || Array.isArray(config.layouts)) throw new Error("layouts must be an object indexed by slot number");
       for (const rows of Object.values(config.layouts)) {
-        if (!Array.isArray(rows) || !rows.length || rows.length > 128 || rows.some(row => !Array.isArray(row) || row.length > 128)) throw new Error("Неверная схема платы");
+        if (!Array.isArray(rows) || !rows.length || rows.length > 128 || rows.some(row => !Array.isArray(row) || row.length > 128)) throw new Error("Invalid board layout");
         layoutCells([], rows, columns);
       }
     }
@@ -91,32 +91,32 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     root.replaceChildren();
     const style = this._node("style"); style.textContent = css; root.append(style);
     const card = this._node("ha-card"); root.append(card);
-    if (cfg.demo) card.append(this._node("div", "demo", "ДЕМОНСТРАЦИЯ · вымышленные данные, без подключения к майнеру"));
+    if (cfg.demo) card.append(this._node("div", "demo", "DEMO · synthetic data, no miner connection"));
     const header = this._node("header");
-    const heading = this._node("div"); heading.append(this._node("div", "title", cfg.title || "HA-WhatsMiner · карта чипов"));
-    heading.append(this._node("div", "subtitle", "Температура каждого чипа · °C")); header.append(heading);
+    const heading = this._node("div"); heading.append(this._node("div", "title", cfg.title || "HA-WhatsMiner · chip heatmap"));
+    heading.append(this._node("div", "subtitle", "Individual chip temperatures · °C")); header.append(heading);
     const modes = this._node("div", "modes");
-    for (const [value, label] of [["absolute", "Температура"], ["delta", "Δ от медианы"]]) {
+    for (const [value, label] of [["absolute", "Temperature"], ["delta", "Δ from median"]]) {
       const button = this._node("button", `mode ${this._mode === value ? "active" : ""}`, label);
       button.type = "button"; button.setAttribute("aria-pressed", String(this._mode === value));
       button.onclick = () => { this._mode = value; this._render(); };
       modes.append(button);
     }
     header.append(modes); card.append(header);
-    const details = this._node("div", "details", "Выберите чип, чтобы увидеть его температуру и отклонение от медианы платы.");
+    const details = this._node("div", "details", "Select a chip to view its temperature and deviation from the board median.");
     for (const id of cfg.entities) {
       const state = this._hass.states[id];
       const board = this._node("section", "board"); card.append(board);
       if (!state || ["unavailable", "unknown"].includes(state.state) || !Array.isArray(state.attributes.chips)) {
-        board.append(this._node("div", "message", `${id}: нет свежих данных чипов`)); continue;
+        board.append(this._node("div", "message", `${id}: no fresh chip data`)); continue;
       }
       const chips = state.attributes.chips.map(chip => ({ ...chip, id: String(chip.id), temperature: finiteTemperature(chip.temperature) }));
       const values = chips.map(chip => chip.temperature).filter(value => value !== null);
       const reference = median(values);
       const slot = state.attributes.slot;
       const boardHead = this._node("div", "boardhead");
-      boardHead.append(this._node("div", "boardname", `Плата · Slot ${slot ?? "?"}`));
-      boardHead.append(this._node("div", "stats", values.length ? `min ${Math.min(...values).toFixed(1)}° · ср ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}° · max ${Math.max(...values).toFixed(1)}° · ${values.length}/${chips.length}` : "Нет измерений"));
+      boardHead.append(this._node("div", "boardname", `Board · Slot ${slot ?? "?"}`));
+      boardHead.append(this._node("div", "stats", values.length ? `min ${Math.min(...values).toFixed(1)}° · avg ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}° · max ${Math.max(...values).toFixed(1)}° · ${values.length}/${chips.length}` : "No readings"));
       board.append(boardHead);
       let placement;
       try { placement = layoutCells(chips, cfg.layouts?.[String(slot)], cfg.columns); }
@@ -125,20 +125,20 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       const grid = this._grid(placement.cells, placement.columns, reference, slot, details);
       board.append(grid);
       if (placement.remaining.length) {
-        board.append(this._node("div", "placement", "Чипы вне заданной схемы — проверьте расположение"));
+        board.append(this._node("div", "placement", "Chips outside the specified layout — check their placement"));
         const extra = placement.remaining.map((chip, index) => ({ ...chip, row: Math.floor(index / cfg.columns), column: index % cfg.columns }));
         board.append(this._grid(extra, cfg.columns, reference, slot, details));
       }
       if (state.attributes.updated_at) {
         const date = new Date(state.attributes.updated_at);
-        if (!Number.isNaN(date.valueOf())) board.append(this._node("div", "note", `Обновлено ${date.toLocaleString()}`));
+        if (!Number.isNaN(date.valueOf())) board.append(this._node("div", "note", `Updated ${date.toLocaleString("en-GB")}`));
       }
     }
     const legend = this._node("div", "legend");
     const left = this._mode === "absolute" ? `${cfg.min_temperature}°C` : "−15°C";
     const right = this._mode === "absolute" ? `${cfg.max_temperature}°C` : "+15°C";
-    legend.append(this._node("span", "", left), this._node("div", `bar ${this._mode === "delta" ? "delta" : ""}`), this._node("span", "", right), this._node("span", "", "▨ Нет измерения"));
-    card.append(legend, details, this._node("div", "note", "Цветовая шкала — способ сравнения измерений, а не допустимый температурный предел. В условной сетке соседство чипов не отражает геометрию платы."));
+    legend.append(this._node("span", "", left), this._node("div", `bar ${this._mode === "delta" ? "delta" : ""}`), this._node("span", "", right), this._node("span", "", "▨ No reading"));
+    card.append(legend, details, this._node("div", "note", "The color scale compares readings; it is not a temperature limit. Logical grid adjacency does not represent the physical board geometry."));
   }
   _grid(cells, columns, reference, slot, details) {
     const scroll = this._node("div", "scroll"), grid = this._node("div", "grid");
@@ -163,4 +163,4 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
 }
 if (!customElements.get("ha-whatsminer-heatmap-card")) customElements.define("ha-whatsminer-heatmap-card", HAWhatsminerHeatmapCard);
 window.customCards = window.customCards || [];
-if (!window.customCards.some(card => card.type === "ha-whatsminer-heatmap-card")) window.customCards.push({ type: "ha-whatsminer-heatmap-card", name: "HA-WhatsMiner HeatMap", description: "Температуры отдельных чипов из WEB" });
+if (!window.customCards.some(card => card.type === "ha-whatsminer-heatmap-card")) window.customCards.push({ type: "ha-whatsminer-heatmap-card", name: "HA-WhatsMiner HeatMap", description: "Individual chip temperatures from the web interface" });

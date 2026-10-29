@@ -13,7 +13,7 @@ class WhatsminerProblem(WhatsminerEntity, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "error-count", "Ошибки майнера")
+        super().__init__(coordinator, "error-count", "Miner errors")
         self._attr_unique_id += "_problem"
 
     @property

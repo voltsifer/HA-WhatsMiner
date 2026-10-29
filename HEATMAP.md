@@ -1,54 +1,58 @@
-# Карточка HeatMap
+# Chip heatmap card
 
-Карточка работает с индивидуальными показаниями, полученными WEB-адаптером. Статистики min/avg/max из API для неё недостаточно.
+The card requires individual chip readings from the web adapter. API board minimum/average/maximum statistics are insufficient to reconstruct individual temperatures.
 
-## Подключение ресурса
+## Register the resource
 
-JS устанавливается вместе с интеграцией, в том числе через HACS. После установки и перезапуска Home Assistant:
+The JavaScript is installed with the integration, including HACS installations. After installing and restarting Home Assistant:
 
-1. Откройте настройки панели → меню ⋮ → **Ресурсы**. Для доступа может потребоваться расширенный режим профиля. В некоторых версиях: Настройки → Панели → меню ⋮ → Ресурсы.
-2. Добавьте URL **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.2.0`**, тип **JavaScript module**.
-3. Обновите страницу. При обновлении JS меняйте параметр версии либо очищайте кэш браузера.
-4. Добавьте ручную карточку с фактическими entity_id датчиков **«Плата N карта чипов WEB»**:
+1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
+2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.3.0`**, type **JavaScript module**.
+3. Reload the browser. Update the URL version parameter or clear the browser cache after upgrading the card.
+4. Add a manual card using the actual entity IDs of your **Board N web chip map** sensors:
 
 ```yaml
 type: custom:ha-whatsminer-heatmap-card
-title: WhatsMiner — температуры чипов
+title: WhatsMiner chip temperatures
 entities:
   - sensor.replace_with_board_0_web_map
   - sensor.replace_with_board_1_web_map
   - sensor.replace_with_board_2_web_map
-columns: 10
+columns: 14
 min_temperature: 70
 max_temperature: 110
 ```
 
-`columns` определяет только ширину условной сетки. Значения 70–110°C задают цветовую шкалу и не являются рекомендацией допустимых температур.
+List only boards that actually exist. The integration does not assume three boards. `columns` controls the logical grid width, not physical board geometry. A board with 172 readings produces 172 chip cells, including cells whose readings are missing. The 70–110°C values define only the color scale, not recommended operating limits.
 
-## Что показывает
+## Display
 
-- ID каждого чипа и его температуру.
-- Минимум, среднюю, максимум и число полученных измерений платы.
-- При выборе чипа — температуру и разницу с медианой его платы.
-- Переключение между температурой и отклонением от медианы. Шкала отклонений фиксирована от −15 до +15°C.
-- Серую штриховку, когда измерения нет.
-- Время последнего получения и сообщение о недоступности вместо прежних показаний при ошибке источника.
+- Every source chip ID and temperature.
+- Board minimum, average, maximum and available reading count.
+- Selected chip details, including deviation from its board median.
+- A switch between absolute temperature and median deviation. The deviation scale is fixed at −15 to +15°C.
+- Gray hatching for missing measurements.
+- Last successful update time. A source error replaces the old map with an unavailable message.
 
-Карточка не вычисляет температуру пропавшего чипа по соседям. Статистическое отклонение само по себе не означает неисправность.
+The card does not infer missing temperatures from neighbors. A statistical temperature deviation alone does not prove a hardware fault.
 
-## Физическая схема платы
+All card labels and error messages are English. Existing Home Assistant entity IDs and customized names remain under HA's entity registry control.
 
-По умолчанию показана **условная сетка**, что явно подписано. Порядок ответа не доказывает расположение на текстолите.
+## Physical layout
 
-После сверки маркировки с фото/документацией конкретной хешплаты можно указать `layouts` по номеру слота. Ниже только пример синтаксиса, а не схема M60 или другой модели:
+Without verified geometry, the card explicitly labels its arrangement as a **logical grid**. Response order does not establish a chip's physical location.
+
+After checking the labels against a photo or documentation for the actual hashboard, provide a layout indexed by slot. This is a syntax example, not a model-specific board diagram:
 
 ```yaml
 layouts:
   "0":
-    - [U1, U2, U3]
-    - [U6, U5, U4]
+    - [C0, C1, C2]
+    - [C5, C4, C3]
 ```
 
-`null` в массиве означает пустое место. Чипы, которых нет в схеме, отображаются отдельно с предупреждением. Если в схеме указан отсутствующий в ответе чип, ячейка остаётся с отсутствующим измерением. При наличии у всех чипов `row`/`column` из WEB карточка использует эти координаты, но всё равно предлагает сверить их с платой.
+Use the actual IDs returned by your source. LuCI logs commonly use `C0` and subsequent zero-based IDs. A normalized JSON source can use other explicit IDs; the integration preserves them.
 
-Демо: `examples/heatmap-demo.html` — одна условная плата со 172 чипами, вымышленные температуры, без сетевых запросов к майнеру. Запуск через `python -m http.server 8000` из корня проекта.
+`null` entries leave empty physical positions. Chips omitted from a configured layout remain visible in a separate section. A layout position whose chip is absent from the response shows a missing reading. If all source chips include explicit `row` and `column` fields, the card can use them, while still asking you to verify the mapping against the board.
+
+`examples/heatmap-demo.html` demonstrates one logical board with 172 chips and synthetic data, without miner requests. Serve the project with `python -m http.server 8000` to open it locally.

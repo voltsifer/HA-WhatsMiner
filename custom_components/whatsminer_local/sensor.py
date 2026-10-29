@@ -10,41 +10,41 @@ from .entity import WhatsminerEntity
 
 # key -> (display name, unit, device class)
 DESCRIPTIONS = {
-    "power-realtime": ("Мощность", UnitOfPower.WATT, SensorDeviceClass.POWER),
-    "power-5min": ("Мощность за 5 минут", UnitOfPower.WATT, SensorDeviceClass.POWER),
-    "power-limit": ("Действующий лимит мощности", UnitOfPower.WATT, SensorDeviceClass.POWER),
-    "configured-power": ("Заданная мощность", UnitOfPower.WATT, SensorDeviceClass.POWER),
-    "environment-temperature": ("Температура воздуха", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-min": ("Чипы минимум", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-avg": ("Чипы средняя", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-max": ("Чипы максимум", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "hash-average": ("Хешрейт средний", "TH/s", None),
-    "hash-realtime": ("Хешрейт текущий", "TH/s", None),
-    "hash-1min": ("Хешрейт за 1 минуту", "TH/s", None),
-    "hash-15min": ("Хешрейт за 15 минут", "TH/s", None),
-    "freq-avg": ("Частота средняя", "MHz", SensorDeviceClass.FREQUENCY),
-    "fan-speed-in": ("Вентилятор вход", "rpm", None),
-    "fan-speed-out": ("Вентилятор выход", "rpm", None),
-    "elapsed": ("Время работы майнинга", UnitOfTime.SECONDS, SensorDeviceClass.DURATION),
-    "power-rate": ("Энергоэффективность", "J/TH", None),
-    "psu-vin": ("БП напряжение входа", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE),
-    "psu-iin": ("БП ток входа", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT),
-    "psu-temp0": ("БП температура", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "psu-fanspeed": ("БП вентилятор", "rpm", None),
-    "error-count": ("Количество кодов ошибок", None, None),
-    "power-percent": ("Процент мощности API", PERCENTAGE, None),
-    "up-freq-finish": ("Подбор частоты завершён", None, None),
-    "power-mode": ("Режим мощности", None, None),
-    "chip-web-status": ("Получение чипов WEB", None, None),
+    "power-realtime": ("Power", UnitOfPower.WATT, SensorDeviceClass.POWER),
+    "power-5min": ("Power 5-minute average", UnitOfPower.WATT, SensorDeviceClass.POWER),
+    "power-limit": ("Effective power limit", UnitOfPower.WATT, SensorDeviceClass.POWER),
+    "configured-power": ("Configured power", UnitOfPower.WATT, SensorDeviceClass.POWER),
+    "environment-temperature": ("Ambient temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-min": ("Chip temperature minimum", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-avg": ("Chip temperature average", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-max": ("Chip temperature maximum", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "hash-average": ("Hash rate average", "TH/s", None),
+    "hash-realtime": ("Hash rate realtime", "TH/s", None),
+    "hash-1min": ("Hash rate 1-minute average", "TH/s", None),
+    "hash-15min": ("Hash rate 15-minute average", "TH/s", None),
+    "freq-avg": ("Frequency average", "MHz", SensorDeviceClass.FREQUENCY),
+    "fan-speed-in": ("Intake fan", "rpm", None),
+    "fan-speed-out": ("Exhaust fan", "rpm", None),
+    "elapsed": ("Mining uptime", UnitOfTime.SECONDS, SensorDeviceClass.DURATION),
+    "power-rate": ("Power efficiency", "J/TH", None),
+    "psu-vin": ("PSU input voltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE),
+    "psu-iin": ("PSU input current", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT),
+    "psu-temp0": ("PSU temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "psu-fanspeed": ("PSU fan", "rpm", None),
+    "error-count": ("Error code count", None, None),
+    "power-percent": ("Reported power percentage", PERCENTAGE, None),
+    "up-freq-finish": ("Frequency tuning finished", None, None),
+    "power-mode": ("Power mode", None, None),
+    "chip-web-status": ("Web chip data status", None, None),
 }
 BOARD_FIELDS = {
-    "temperature": ("температура платы", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-min": ("чипы минимум", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-avg": ("чипы средняя", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "chip-temp-max": ("чипы максимум", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
-    "hash-average": ("хешрейт", "TH/s", None),
-    "freq": ("частота", "MHz", SensorDeviceClass.FREQUENCY),
-    "effective-chips": ("активные чипы", None, None),
+    "temperature": ("board temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-min": ("chip temperature minimum", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-avg": ("chip temperature average", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "chip-temp-max": ("chip temperature maximum", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "hash-average": ("hash rate", "TH/s", None),
+    "freq": ("frequency", "MHz", SensorDeviceClass.FREQUENCY),
+    "effective-chips": ("effective chips", None, None),
 }
 
 
@@ -72,7 +72,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 _, slot, field = key.split("-", 2)
                 if field in BOARD_FIELDS:
                     name, unit, device_class = BOARD_FIELDS[field]
-                    description = (f"Плата {slot} {name}", unit, device_class)
+                    description = (f"Board {slot} {name}", unit, device_class)
             if description is not None:
                 entities.append(WhatsminerSensor(coordinator, key, description))
                 seen.add(key)
@@ -109,7 +109,7 @@ class WhatsminerWebBoardSensor(WhatsminerSensor):
 
     def __init__(self, coordinator, key, slot):
         super().__init__(coordinator, key, (
-            f"Плата {slot} карта чипов WEB", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE))
+            f"Board {slot} web chip map", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE))
         self.slot = slot
 
     @property
@@ -125,4 +125,4 @@ class WhatsminerChipSensor(WhatsminerSensor):
 
     def __init__(self, coordinator, key, slot, chip_id):
         super().__init__(coordinator, key, (
-            f"Плата {slot} чип {chip_id} WEB", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE))
+            f"Board {slot} chip {chip_id} web temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE))

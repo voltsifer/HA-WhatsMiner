@@ -25,6 +25,6 @@ test('Explicit mapping preserves missing and unmapped chips', () => {
 });
 test('Unconfirmed geometry is labelled as a logical grid', () => {
   const result = layoutCells([{id:'U8',temperature:95}, {id:'U1',temperature:90}], null, 1);
-  assert.match(result.kind, /Условная сетка/);
+  assert.match(result.kind, /Logical grid/);
   assert.equal(result.cells[1].row, 1);
 });

@@ -54,10 +54,10 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         await self.hass.async_stop()
         self.tmp.cleanup()
 
-    async def add_entry(self, control=False):
+    async def add_entry(self, control=False, extra=None):
         entry = ConfigEntry(version=1, minor_version=1, domain=DOMAIN, title='Test miner',
             data={'host':'192.0.2.10','port':4433,'scan_interval':30,'enable_control':control,
-                  'min_power':1500,'max_power':3500,'account':'super','password':'secret'},
+                  'min_power':1500,'max_power':3500,'account':'super','password':'secret', **(extra or {})},
             options={}, source='user', unique_id='test_mac', discovery_keys={})
         await self.hass.config_entries.async_add(entry)
         await self.hass.async_block_till_done()
@@ -175,3 +175,24 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(coordinator.data['chip-web-status'], 'web_auth_required')
         self.assertEqual(self.hass.states.get(maps[0].entity_id).state, 'unavailable')
         self.assertEqual(coordinator.chip_boards, [])
+
+    async def test_web_session_is_isolated_and_closed_on_unload(self):
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+        from yarl import URL
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 92}]}]
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
+            entry = await self.add_entry(extra={'web_chips': True, 'web_auth': 'luci',
+                'web_username': 'tester', 'web_password': 'web-secret'})
+        client = self.hass.data[DOMAIN][entry.entry_id].web_client
+        self.assertEqual(client.url.path, '/cgi-bin/luci/admin/status/btminerapi')
+        self.assertEqual(client.url.scheme, 'https')
+        self.assertTrue(client.verify_ssl)
+        shared = async_get_clientsession(self.hass)
+        self.assertIsNot(client.session, shared)
+        url = URL('https://192.0.2.10/cgi-bin/luci')
+        client.session.cookie_jar.update_cookies({'sysauth': 'test-token'}, response_url=url)
+        self.assertIn('sysauth', client.session.cookie_jar.filter_cookies(url))
+        await self.hass.config_entries.async_unload(entry.entry_id)
+        self.assertTrue(client.session.closed)
+        self.assertFalse(shared.closed)
+        self.assertFalse(shared.connector.closed)

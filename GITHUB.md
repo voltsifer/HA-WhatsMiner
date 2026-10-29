@@ -1,28 +1,29 @@
-# GitHub и HACS
+# GitHub and HACS
 
-Репозиторий проекта: **https://github.com/voltsifer/HA-WhatsMiner**.
+Project repository: **https://github.com/voltsifer/HA-WhatsMiner**.
 
-## Установка и обновления
+## Installation and updates
 
-1. HACS → меню ⋮ → «Пользовательские репозитории».
-2. Добавьте `https://github.com/voltsifer/HA-WhatsMiner`, тип **Integration**.
-3. Скачайте HA-WhatsMiner и перезапустите Home Assistant.
-4. Настройки → Устройства и службы → Добавить интеграцию → **HA-WhatsMiner**.
+1. Open **HACS → menu ⋮ → Custom repositories**.
+2. Add `https://github.com/voltsifer/HA-WhatsMiner`, category **Integration**.
+3. Download HA-WhatsMiner and restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration → HA-WhatsMiner**.
 
-HACS устанавливает единственную интеграцию `custom_components/whatsminer_local`, включая JS карточки. Второй репозиторий для карточки не нужен. Подключение её ресурса описано в [HEATMAP.md](HEATMAP.md).
+HACS installs the single integration at `custom_components/whatsminer_local`, including the card JavaScript. Resource registration is documented in [HEATMAP.md](HEATMAP.md).
 
-Пока нет GitHub Release, установка выполняется из ветки по умолчанию. Статус проверок доступен на вкладке **Actions**. Публикация в общий каталог HACS — отдельная процедура, для установки по URL она не требуется и здесь не заявляется выполненной.
+Without a GitHub Release, installation uses the default branch. Check the **Actions** tab for current CI results. Inclusion in the default HACS catalog is a separate process and is not required to install this custom repository.
 
-## Для разработки
+## Development
 
-Исходники интеграции находятся в `custom_components/whatsminer_local`. Тесты — в `tests`; workflow — `.github/workflows/tests.yml`. Версия указана в manifest. WEB-адаптер экспериментальный: для поддержки конкретной прошивки нужен фактический ответ с отдельными температурами.
+Integration source is in `custom_components/whatsminer_local`, tests in `tests`, and CI in `.github/workflows/tests.yml`. The manifest declares the integration version. Web chip retrieval supports the LuCI `btminerapi` syslog format, plain text and normalized JSON; actual firmware compatibility must be verified against a saved device response.
 
-При переносе в другой репозиторий `tools/configure_repository.py` меняет только локальные ссылки и codeowners. Он не создаёт репозиторий и не публикует файлы.
+`tools/configure_repository.py` updates local repository URLs and code owners when moving the project. It does not create repositories or publish files.
 
-HACS работает с публичными репозиториями. Пароли и Cookie вводятся в Home Assistant; реальные данные доступа в репозиторий не включены.
+All current project text is English. CI runs `tools/check_english.py` to reject Cyrillic text and removed language files. Binary demo artwork is regenerated with English labels.
 
-Источники:
+The repository is public. Enter passwords and cookies in Home Assistant; real credentials are not included in source control.
+
+References:
 
 - https://www.hacs.xyz/docs/publish/integration/
 - https://www.hacs.xyz/docs/faq/custom_repositories/
-- https://www.hacs.xyz/docs/faq/private_repositories/

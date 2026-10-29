@@ -13,6 +13,7 @@ from .const import (
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN, CONF_PERCENT_MIN, CONF_PERCENT_MODE,
     DEFAULT_PERCENT_MIN, CONF_WEB_CHIPS, CONF_WEB_PROTOCOL, CONF_WEB_PORT, CONF_WEB_PATH,
     CONF_WEB_POINTER, CONF_WEB_AUTH, CONF_WEB_USERNAME, CONF_WEB_PASSWORD, CONF_WEB_COOKIE,
+    CONF_WEB_VERIFY_SSL, DEFAULT_WEB_PATH, DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT,
 )
 
 
@@ -55,12 +56,13 @@ def control_error(values):
 
 def web_schema(values):
     fields = {
-        vol.Required(CONF_WEB_PROTOCOL, default=values.get(CONF_WEB_PROTOCOL, "http")): vol.In(("http", "https")),
-        vol.Required(CONF_WEB_PORT, default=values.get(CONF_WEB_PORT, 80)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-        vol.Required(CONF_WEB_PATH, default=values.get(CONF_WEB_PATH, "")): str,
+        vol.Required(CONF_WEB_PROTOCOL, default=values.get(CONF_WEB_PROTOCOL, DEFAULT_WEB_PROTOCOL)): vol.In(("http", "https")),
+        vol.Required(CONF_WEB_PORT, default=values.get(CONF_WEB_PORT, DEFAULT_WEB_PORT)): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+        vol.Required(CONF_WEB_PATH, default=values.get(CONF_WEB_PATH, DEFAULT_WEB_PATH)): str,
         vol.Optional(CONF_WEB_POINTER, default=values.get(CONF_WEB_POINTER, "")): str,
-        vol.Required(CONF_WEB_AUTH, default=values.get(CONF_WEB_AUTH, "none")): vol.In(("none", "basic", "cookie")),
+        vol.Required(CONF_WEB_AUTH, default=values.get(CONF_WEB_AUTH, "luci")): vol.In(("none", "basic", "cookie", "luci")),
         vol.Optional(CONF_WEB_USERNAME, default=values.get(CONF_WEB_USERNAME, "")): str,
+        vol.Required(CONF_WEB_VERIFY_SSL, default=values.get(CONF_WEB_VERIFY_SSL, True)): bool,
     }
     for key in (CONF_WEB_PASSWORD, CONF_WEB_COOKIE):
         fields[vol.Optional(key)] = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
@@ -87,7 +89,7 @@ class WebFlowMixin:
                     raise ValueError("Invalid JSON pointer")
             except ValueError:
                 errors["base"] = "invalid_web_endpoint"
-            if combined[CONF_WEB_AUTH] == "basic" and not (combined.get(CONF_WEB_USERNAME) and combined.get(CONF_WEB_PASSWORD)):
+            if combined[CONF_WEB_AUTH] in ("basic", "luci") and not (combined.get(CONF_WEB_USERNAME) and combined.get(CONF_WEB_PASSWORD)):
                 errors["base"] = "web_credentials_required"
             if combined[CONF_WEB_AUTH] == "cookie" and not combined.get(CONF_WEB_COOKIE):
                 errors["base"] = "web_credentials_required"

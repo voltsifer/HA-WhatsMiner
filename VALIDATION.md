@@ -1,51 +1,53 @@
-# Проверки HA-WhatsMiner 0.2.0
+# HA-WhatsMiner 0.3.0 validation
 
-Дата: 29 октября 2026 года.
+Date: October 29, 2026.
 
-**26 Python-тестов + 9 JavaScript-тестов прошли; всего 35.**
+**38 Python tests and 9 JavaScript tests pass: 47 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
-| Проверка | Среда / результат |
+| Area | Coverage and limits |
 | --- | --- |
-| API 3.x, TCP framing, авторизация, команды мощности | Локальный TCP-эмулятор; пройдено |
-| WEB GET, Basic/Cookie, JSON, ошибки и переадресации | Локальный HTTP-эмулятор; пройдено |
-| Реальная загрузка/выгрузка платформ HA, формы и действия number/select | Core 2024.12.5, Python 3.12.14; пройдено |
-| Изоляция ошибок WEB от API и доступность датчиков | Core с подменённым API/WEB-клиентом; пройдено |
-| Расчёты, размещение, отсутствующие показания | Node.js; 4 теста пройдены |
-| Создание DOM карточки, выбор чипа, переключение режима, отсутствие старых показаний и HTML-инъекции | happy-dom 21.0.4; 5 тестов пройдены |
-| Реальный WhatsMiner и источник WEB конкретной прошивки | Не проверено; требуются модель, прошивка и фактический ответ WEB |
-| Физическое соответствие chip ID координатам платы | Не подтверждено |
-| GitHub / HACS | Репозиторий voltsifer/HA-WhatsMiner; актуальный статус CI см. на вкладке Actions. Установка в HAOS пользователя ещё не проверена |
-| Проверка полного отображения в браузере | Не выполнена: Chromium недоступен в среде; выполнены DOM-проверки |
+| API 3.x TCP transport and authenticated writes | Local TCP emulator; framing, fragmented responses, heartbeats, timeouts, invalid/truncated/oversized responses and authentication vectors |
+| Power controls | Watt and percentage commands, bounds, tuning guard, separate measured/configured power and no automatic write retry |
+| Home Assistant integration | Core 2024.12.5 on Python 3.12; setup/unload, forms, number/select actions, dynamic discovery and availability |
+| Web JSON transport | Local HTTP emulator; Basic/Cookie authentication, JSON Pointer, identity checks and redirect rejection |
+| LuCI HTML/plain-text parsing | Synthetic syslog pages and text, 172 chips per board, preserved C0-based IDs, missing readings, duplicate IDs, login pages and truncated HTML |
+| LuCI authentication | Local server; login form POST, IP-address cookies, session reuse, expired-cookie renewal and no repeated login loop after rejected credentials |
+| HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
+| Session cleanup | Isolated per-miner cookie session is detached on unload without closing Home Assistant's shared connector |
+| Heatmap calculations | Four Node.js tests for values, color scales, mapping and missing data |
+| Heatmap DOM | Five happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
+| Project language | English labels, documentation and regenerated artwork; CI rejects Cyrillic text and removed language files |
+| Actual miner firmware | Not verified; the supplied private endpoint is unreachable from this environment and its actual response is still needed |
+| Physical chip placement | Not verified; the demo grid is logical, not a model-specific board diagram |
+| Installation in the user's HAOS | Not verified; source is prepared for HACS custom repository installation |
+| Full browser rendering | DOM checks performed; a complete Chromium visual test was unavailable in the environment |
 
-API-проверки включают фрагментацию ответа, heartbeat, тайм-аут, неверный/слишком большой/оборванный ответ, контрольный токен производителя, отсутствие пароля в команде, отсутствие автоматического повтора, запрос `set.miner.power_percent` с объектом `{percent, mode}`, границы, пропущенные значения и привязку по slot.
+API and web tests use local emulators or mocked device responses. They do not establish hardware operating limits or guarantee compatibility with every firmware revision.
 
-Проверки Core включают отсутствие записей при подключении/изменении опций/выборе режима, запрет процента во время явно сообщённого подбора частот, отдельные фактическую и заданную мощности, недоступность при ошибке, новые платы и очистку индивидуальных данных при ошибке WEB. Управление процентом после reboot автоматически не восстанавливается.
+The LuCI endpoint and log grammar are supported based on the supplied path and a public client using that format. The implementation extracts `textarea#syslog`, recognizes explicit slot and chip records, and never reconstructs individual temperatures from board minimum/average/maximum statistics. Real firmware may differ; a sanitized response is needed to verify it.
 
-WEB-тесты используют **выбранный внутренний контракт** на синтетических данных. Они не доказывают, что штатная прошивка WhatsMiner возвращает этот формат. Публичного подтверждённого endpoint для оборудования пользователя пока нет. LuCI login, Digest, POST и WebSocket не реализованы без фактического образца.
+`examples/heatmap-demo.html` uses synthetic data for one 172-chip board. `examples/heatmap-demo.png` is a static illustration of the same concept, not a Home Assistant screenshot. Both use English labels and do not imply physical board geometry.
 
-`examples/heatmap-demo.html` содержит вымышленные измерения. `examples/heatmap-demo.png` — статическая иллюстрация той же концепции, не снимок запущенной карточки HA. Число и размещение чипов не относятся к конкретной модели.
+## Reproduce the checks
 
-## Воспроизведение
-
-Полный Python-набор в отдельном окружении Python 3.12 с `homeassistant==2024.12.5`, `habluetooth==3.49.0`:
+Use a disposable Python 3.12 environment with `homeassistant==2024.12.5` and `habluetooth==3.49.0`:
 
 ```bash
+python tools/check_english.py
 python -m unittest discover -s tests -v
 ```
 
-Только независимый TCP/API-набор (Python 3.11+):
+The TCP/API-only tests are independent of Home Assistant and require Python 3.11+:
 
 ```bash
 python -m unittest discover -s tests -p test_api.py -v
 ```
 
-JavaScript (Node.js 22+):
+JavaScript tests use Node.js 22+:
 
 ```bash
 npm ci --ignore-scripts
 npm test
 ```
 
-Зависимости npm нужны только разработчику для DOM-тестов. JS карточки не требует npm, CDN или стороннего JS в HAOS.
-
-CI-файл `.github/workflows/tests.yml` включён; актуальный статус удалённых проверок находится на вкладке Actions. Metadata HACS заполнены для `voltsifer/HA-WhatsMiner`; включение в общий каталог HACS и установка в HAOS пользователя не заявляются выполненными. Набор тестов проверяет 172 чипа на каждой из двух синтетических плат отдельно, а DOM-тест — отображение всех 172 ячеек без усечения. Реальный ответ прошивки по-прежнему не получен.
+The npm dependencies are only for development tests. The production card has no npm, CDN or external JavaScript dependency.

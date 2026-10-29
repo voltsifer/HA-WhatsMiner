@@ -1,74 +1,70 @@
 # HA-WhatsMiner
 
-Локальная интеграция Home Assistant / HAOS для WhatsMiner. Версия **0.2.0**.
-Прямое подключение к официальному API 3.x по TCP 4433, без MQTT, Node-RED и облака.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.3.0**.
 
-Реализованы управление мощностью в ваттах, **`set.miner.power_percent`** с выбором `normal`/`fast`, телеметрия плат и карточка **HeatMap отдельных чипов**. WEB-источник пока экспериментальный: адрес запроса и формат данных конкретной прошивки пользователя ещё не получены. Статистика min/avg/max из API не подменяет индивидуальные температуры.
+Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
-![Статическая иллюстрация HeatMap на вымышленных данных](examples/heatmap-demo.png)
+Power control and API telemetry are implemented. Individual chip temperatures can be read from a LuCI `btminerapi` HTML page, its plain-text log, or a normalized JSON endpoint. The LuCI format is covered by synthetic tests; compatibility with the user's actual firmware response still needs confirmation.
 
-## Возможности
+![Synthetic heatmap example: one board with 172 chips](examples/heatmap-demo.png)
 
-- Температуры плат; min/avg/max чипов всего майнера и отдельно каждой платы.
-- Хешрейт, частоты, количество активных чипов, вентиляторы, параметры БП и ошибки.
-- Раздельные фактическая мощность, заданная мощность и действующий лимит.
-- Поле мощности в ваттах с границами пользователя.
-- Поле процента мощности и локальный переключатель режима применения `normal`/`fast`.
-- Опциональный WEB JSON-адаптер, отдельные учётные данные WEB и статус получения.
-- HeatMap: номера чипов, температуры, минимум/средняя/максимум, отклонение от медианы, отсутствующие измерения, явная схема расположения.
-- Для каждого чипа предусмотрен отдельный датчик, по умолчанию выключенный в реестре сущностей. Для самой карты включать их не нужно.
-- Настройка через интерфейс, несколько майнеров, опрос каждые 30 секунд по умолчанию.
+## Features
 
-## Установка
+- Board temperatures and chip minimum/average/maximum temperatures, globally and per board.
+- Hash rates, frequencies, effective chip counts, fans, PSU telemetry and error codes.
+- Separate measured power, configured power and effective power limit sensors.
+- Explicit power control in watts with user-defined bounds.
+- `set.miner.power_percent` control and a local `normal` / `fast` adjustment-mode selector.
+- Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
+- Optional LuCI session login and renewal, HTTP Basic authentication or an existing session cookie.
+- A heatmap card with chip IDs, temperatures, statistics, median deviations and explicit board layouts.
+- One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
+- Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
 
-### Через HACS
+## Install through HACS
 
-Репозиторий: **https://github.com/voltsifer/HA-WhatsMiner**. Добавьте его как пользовательскую интеграцию HACS; инструкция также в [GITHUB.md](GITHUB.md).
+Repository: **https://github.com/voltsifer/HA-WhatsMiner**.
 
-Репозиторий публичный. Для установки:
+1. Open **HACS → menu ⋮ → Custom repositories**.
+2. Add `https://github.com/voltsifer/HA-WhatsMiner`, category **Integration**.
+3. Download **HA-WhatsMiner** and restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration → HA-WhatsMiner**.
+5. Enter the miner host, API port **4433** and polling interval, normally **30 seconds**.
 
-1. HACS → меню ⋮ → «Пользовательские репозитории».
-2. Добавить `https://github.com/voltsifer/HA-WhatsMiner`, тип **Integration**.
-3. Скачать интеграцию и перезапустить Home Assistant.
-4. Настройки → Устройства и службы → Добавить интеграцию → **HA-WhatsMiner**.
+Start with power control and web chip data disabled, then compare API telemetry with the miner's interface. HACS installs the heatmap JavaScript with the integration; a second dashboard repository is unnecessary. See [HEATMAP.md](HEATMAP.md) for resource registration.
 
-При последующих выпусках HACS позволит обновлять интеграцию оттуда. Для карточки не требуется второй репозиторий: JS находится внутри интеграции и обновляется вместе с ней.
+### Manual installation and upgrades
 
-### Вручную из архива
+Place `custom_components/whatsminer_local` at `/config/custom_components/whatsminer_local`, then restart Home Assistant. Replace the integration directory when upgrading manually so removed translation files are not left behind. The internal domain remains `whatsminer_local` to preserve integration identity.
 
-1. Скопируйте `custom_components/whatsminer_local` в `/config/custom_components/whatsminer_local`.
-2. Проверьте путь `/config/custom_components/whatsminer_local/manifest.json`.
-3. Перезапустите Home Assistant и добавьте **HA-WhatsMiner** через интерфейс.
-4. Укажите IP майнера, порт **4433**, интервал **30** секунд. Первую проверку выполните с выключенными управлением и WEB-адаптером.
+Existing entity IDs and user-customized names are maintained by Home Assistant. Renaming a default display label does not intentionally rename an entity ID or rewrite automations.
 
-При обновлении с 0.1.0 замените содержимое той же папки и перезапустите HA. Внутренний домен `whatsminer_local` сохранён, чтобы существующая запись и сущности продолжили работать. Имя проекта и отображаемое имя — HA-WhatsMiner.
+## Power control
 
-## Управление мощностью
+Enable power control in the integration options. Enable API Write in WhatsminerTool. The manufacturer also requires changing the default `admin` password; API `account` accepts **`super`, `user1`, `user2`, `user3`**, rather than `admin`.
 
-В «Настроить» включите управление. В WhatsminerTool должен быть разрешён API Write. По документации производителя также требуется изменить стандартный пароль `admin`; для поля API `account` используются **`super`, `user1`, `user2`, `user3`**, а не `admin`.
+Provide the matching API password and watt limits appropriate for your exact miner and PSU. Hardware limits are not inferred.
 
-Укажите пароль соответствующей API-учётной записи и границы мощности именно для вашей модели/БП. Минимум/максимум в ваттах автоматически не угадываются.
-
-| Сущность | Действие |
+| Entity | Behavior |
 | --- | --- |
-| Установка мощности | `set.miner.power`, целые ватты, границы пользователя |
-| Установка процента мощности | `set.miner.power_percent`, целый процент от исходной стабильной мощности |
-| Режим изменения процента мощности | Выбор `normal` или `fast` для следующей явной команды; сам по себе ничего в майнер не отправляет |
-| Процент мощности API | Значение `get.miner.setting → power-percent` как возвращено прошивкой, без интерпретации 0 как 100% |
+| Set power | Sends `set.miner.power` with an integer watt value within your configured bounds |
+| Set power percentage | Sends `set.miner.power_percent` with an integer percentage of initial stable power |
+| Power percentage adjustment mode | Selects `normal` or `fast` for the next explicit percentage command; selecting it does not write to the miner |
+| Reported power percentage | Shows the firmware's `get.miner.setting → power-percent`, without treating 0 as 100% |
 
-**Процент — не доля паспортной мощности и не процент текущего потребления.** Производитель определяет его относительно исходной стабильной мощности после подбора частот. Приблизительный пример: если исходная стабильная мощность равна 3500 Вт, то 80% соответствует ориентиру `3500 × 80 / 100 = 2800 Вт`; измеренная мощность может отличаться.
+The percentage refers to **initial stable power after frequency tuning**, not rated power or current measured consumption. For example, an initial stable power of 3500 W at 80% gives an approximate target of `3500 × 80 / 100 = 2800 W`; actual consumption can differ.
 
-- Диапазон API: **0–100%**. Нижняя граница интерфейса по умолчанию 50%, её можно изменить в настройках. Это ограничитель команды, а не гарантия устойчивой работы при 50%.
-- `normal`: изменение за несколько минут; рекомендованный производителем режим для частой регулировки. На воздушном охлаждении доступен в Normal/Low Power; на жидкостном таких ограничений нет.
-- `fast`: около секунды, с большей потерей эффективности и устойчивости; для кратковременных изменений.
-- Команда действует после окончания подбора частот. Когда API явно возвращает `up-freq-finish = 0`, интеграция блокирует её до завершения. Если поле отсутствует, решение остаётся за прошивкой.
-- Процент **не сохраняется майнером после перезагрузки**. Интеграция не восстанавливает его автоматически.
-- В отличие от процента, `set.miner.power` в API 3.0.3+ записывает настройку в конфигурацию майнера. Во время подбора частот эта команда может вступить в силу только при следующем запуске.
-- После перезагрузки интеграции локальный выбор режима возвращается к значению по умолчанию из настроек.
+- The API permits 0–100%. The integration's default lower bound is 50%, configurable in options. That bound is a command restriction, not a guarantee of stable operation.
+- `normal` takes several minutes and is the manufacturer's preferred mode for frequent adjustments. On air-cooled miners it is available in Normal/Low Power modes; liquid-cooled miners do not have this restriction.
+- `fast` takes approximately one second, with greater performance loss and lower stability.
+- Percentage control is effective after frequency tuning. The integration blocks it while the API explicitly reports `up-freq-finish = 0`. If this field is absent, the firmware decides whether to accept the command.
+- The miner does **not persist the percentage after reboot**. The integration does not automatically restore it.
+- `set.miner.power` persists its watt setting on API 3.0.3+. During tuning, that command may take effect only after the next miner start.
+- Reloading the integration resets the local mode selector to the configured default.
 
-Подключение, изменение границ, выбор режима, опрос и перезапуск HA не отправляют команды мощности. Команда отправляется при явной установке `number`; повтор уже подтверждённого текущего значения пропускается. Потерянный ответ не вызывает автоматический повтор. Ответ `ok` не подменяет измеренное значение в HA.
+Setup, polling, mode selection, bound changes and HA restarts do not issue power commands. Commands are sent only when explicitly setting a number entity. A value already confirmed by telemetry is skipped. A timed-out write is not retried automatically, and an `ok` response does not replace measured telemetry with an optimistic value.
 
-Пример действия автоматизации (замените entity_id на ваш):
+Example action; replace the entity ID with yours:
 
 ```yaml
 action: number.set_value
@@ -78,47 +74,59 @@ data:
   value: 80
 ```
 
-## WEB и HeatMap
+## Individual chip temperatures
 
-Инструкции: [WEB_CHIPS.md](WEB_CHIPS.md), [HEATMAP.md](HEATMAP.md).
+The default web profile uses:
 
-Стандартный API предоставляет сводные температуры. Для каждого чипа нужен реальный источник индивидуальных измерений. Публичного подтверждённого WEB endpoint для вашей прошивки пока нет. Поэтому адаптер выключен по умолчанию, не перебирает адреса и не имитирует показания.
+```text
+Protocol: https
+Port: 443
+Path: /cgi-bin/luci/admin/status/btminerapi
+Authentication: luci
+JSON Pointer: leave blank for HTML or text
+```
 
-Карточка уже реализована. Демо на вымышленных значениях доступно в `examples/heatmap-demo.html`. Оно не подключается к майнеру. Для открытия из корня проекта:
+The integration reads `C<n>` chip records inside `slot:` blocks from the page's `textarea#syslog`. It preserves the source IDs, including zero-based IDs such as `C0`; it does not rename them to `U1` or infer temperatures from board statistics.
+
+LuCI credentials are separate from API credentials. Certificate verification is enabled by default. For a trusted local miner with a self-signed certificate, you can explicitly disable **Verify HTTPS certificate** in the web options. This affects only that miner's web requests.
+
+The supplied path is known, but the private device cannot be reached from this development environment. A saved page response is still needed to verify your firmware's exact log shape. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
+
+## Heatmap
+
+See [HEATMAP.md](HEATMAP.md). The live card uses actual individual chip data. Without confirmed coordinates it displays a clearly labelled **logical grid**, which does not imply physical adjacency on the board.
+
+Run the synthetic 172-chip demo locally:
 
 ```bash
 python -m http.server 8000
 ```
 
-Затем откройте `http://localhost:8000/examples/heatmap-demo.html`.
+Open `http://localhost:8000/examples/heatmap-demo.html`. The demo does not connect to a miner. Its PNG preview is a static illustration, not a screenshot of a running Home Assistant dashboard.
 
-На плате пользователя **172 чипа**; интеграция получает число и ID чипов отдельно для каждой платы из ответа WEB. Число плат не предполагается заранее. Физическое размещение чипов зависит от хешплаты. Без подтверждённой карты карточка показывает **условную сетку** с явной подписью. Схему можно задать массивом chip ID; нельзя делать вывод о физических соседях по порядку в ответе.
+## Diagnostics and availability
 
-## Диагностика
-
-В сети майнера с Python 3.11+:
+From a computer on the miner's network, with Python 3.11+:
 
 ```powershell
 py tools\probe.py 192.168.1.100
 ```
 
-Скрипт выполняет только чтение API. Выводит модель, прошивку, версию API и измерения, исключая соль авторизации, MAC, серийные номера и параметры пулов. Старый API 2.x на 4028 не поддерживается.
+The probe performs API reads only and prints model, firmware, API version and selected telemetry. It excludes salts, MAC addresses, serial numbers and pool credentials. API 2.x on port 4028 is not supported.
 
-При потере API-связи сущности становятся недоступными. Ошибка WEB делает недоступными только индивидуальные чипы/карты, сохраняя доступную API-телеметрию. Cookie может истечь: автоматический вход LuCI в этой версии не реализован.
+An API failure makes API entities unavailable. A web failure invalidates individual chip data and heatmaps without discarding otherwise valid API readings. The LuCI session is isolated per miner and closed when the integration unloads. Diagnostic downloads exclude configured credentials, cookies and endpoint URLs.
 
-Диагностика интеграции содержит только выбранную телеметрию и сведения о модели/прошивке; настройки WEB и API с паролями/куки в неё не включаются.
+## Uninstall
 
-## Удаление
+Remove the integration entry under **Devices & services**, then remove its HACS installation or custom component directory if desired. Previously commanded power is not automatically restored; restore it explicitly on the miner when necessary. Removing the integration does not change API Write on the miner.
 
-Удалите запись HA-WhatsMiner в «Устройствах и службах», затем при необходимости папку интеграции или запись HACS. Ранее установленная мощность не восстанавливается автоматически. При необходимости явно верните исходное значение на майнере. Удаление не меняет API Write.
+## Validation and references
 
-## Проверки и источники
+See [VALIDATION.md](VALIDATION.md) for test coverage and remaining hardware limitations.
 
-См. [VALIDATION.md](VALIDATION.md). Проверки эмулятора и тестового Core не подтверждают совместимость WEB с конкретной прошивкой и не заменяют проверку реального оборудования.
+- [Official WhatsMiner API](https://apidoc.whatsminer.com/)
+- [HACS integration requirements](https://www.hacs.xyz/docs/publish/integration/)
+- [HACS custom repositories](https://www.hacs.xyz/docs/faq/custom_repositories/)
+- [Public client demonstrating the LuCI btminerapi log format](https://github.com/HashSource/whatsminer_chip_map/blob/master/src/api.rs)
 
-- [Официальный API WhatsMiner](https://apidoc.whatsminer.com/)
-- [Требования HACS к интеграциям](https://www.hacs.xyz/docs/publish/integration/)
-- [Пользовательские репозитории HACS](https://www.hacs.xyz/docs/faq/custom_repositories/)
-- [Приватные репозитории и HACS](https://www.hacs.xyz/docs/faq/private_repositories/)
-
-MIT License. Проект не является официальной интеграцией MicroBT.
+MIT License. This is not an official MicroBT integration.

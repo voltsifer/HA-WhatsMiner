@@ -3,8 +3,10 @@ import asyncio
 from datetime import timedelta
 import logging
 
+import aiohttp
+
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -13,6 +15,7 @@ from .chip_web import ChipWebClient, ChipWebError
 from .const import (
     CONF_PERCENT_MODE, CONF_WEB_AUTH, CONF_WEB_CHIPS, CONF_WEB_COOKIE, CONF_WEB_PASSWORD,
     CONF_WEB_PATH, CONF_WEB_POINTER, CONF_WEB_PORT, CONF_WEB_PROTOCOL, CONF_WEB_USERNAME,
+    CONF_WEB_VERIFY_SSL, DEFAULT_WEB_PATH, DEFAULT_WEB_PROTOCOL, DEFAULT_WEB_PORT,
     DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN,
 )
 
@@ -32,11 +35,14 @@ class WhatsminerCoordinator(DataUpdateCoordinator):
         self.web_client = None
         if self.config.get(CONF_WEB_CHIPS):
             self.web_client = ChipWebClient(
-                async_get_clientsession(hass), self.config[CONF_HOST],
-                self.config.get(CONF_WEB_PROTOCOL, "http"), self.config.get(CONF_WEB_PORT, 80),
-                self.config[CONF_WEB_PATH], self.config.get(CONF_WEB_POINTER, ""),
+                async_create_clientsession(hass, cookie_jar=aiohttp.CookieJar(unsafe=True)),
+                self.config[CONF_HOST],
+                self.config.get(CONF_WEB_PROTOCOL, DEFAULT_WEB_PROTOCOL),
+                self.config.get(CONF_WEB_PORT, DEFAULT_WEB_PORT),
+                self.config.get(CONF_WEB_PATH, DEFAULT_WEB_PATH), self.config.get(CONF_WEB_POINTER, ""),
                 self.config.get(CONF_WEB_AUTH, "none"), self.config.get(CONF_WEB_USERNAME, ""),
-                self.config.get(CONF_WEB_PASSWORD, ""), self.config.get(CONF_WEB_COOKIE, ""))
+                self.config.get(CONF_WEB_PASSWORD, ""), self.config.get(CONF_WEB_COOKIE, ""),
+                verify_ssl=self.config.get(CONF_WEB_VERIFY_SSL, True), detach_session=True)
         super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(
             seconds=self.config.get(CONF_SCAN_INTERVAL, DEFAULT_INTERVAL)))
 

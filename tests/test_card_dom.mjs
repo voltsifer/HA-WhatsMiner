@@ -23,7 +23,7 @@ test('Card renders, selects a chip and switches the comparison mode', () => {
   root.querySelector('.chip').click();
   assert.match(root.querySelector('.details').textContent, /U1.*92.0/);
   root.querySelectorAll('.mode')[1].click();
-  assert.equal(root.querySelector('.mode.active').textContent, 'Δ от медианы');
+  assert.equal(root.querySelector('.mode.active').textContent, 'Δ from median');
 });
 
 test('A board with 172 chips renders every chip without truncation', () => {
@@ -38,7 +38,7 @@ test('Lost readings are not kept on the map', () => {
   const card = makeCard([{ id: 'U1', temperature: 92 }]);
   card.hass = { states: { [id]: { state: 'unavailable', attributes: { chips: [{ id: 'U1', temperature: 92 }] } } } };
   assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 0);
-  assert.match(card.shadowRoot.textContent, /нет свежих данных/);
+  assert.match(card.shadowRoot.textContent, /no fresh chip data/);
 });
 
 test('Chip labels and titles cannot inject HTML', () => {
@@ -53,5 +53,5 @@ test('Explicit missing positions remain visible and unmatched chips are labelled
   });
   assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 3);
   assert.equal(card.shadowRoot.querySelectorAll('.missing').length, 2);
-  assert.match(card.shadowRoot.textContent, /вне заданной схемы/);
+  assert.match(card.shadowRoot.textContent, /outside the specified layout/);
 });

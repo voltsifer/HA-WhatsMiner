@@ -25,7 +25,7 @@ class WhatsminerPower(WhatsminerEntity, NumberEntity):
     _attr_icon = "mdi:flash"
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "configured-power", "Установка мощности")
+        super().__init__(coordinator, "configured-power", "Set power")
         self._attr_unique_id += "_control"
         self._attr_native_min_value = coordinator.config[CONF_MIN]
         self._attr_native_max_value = coordinator.config[CONF_MAX]
@@ -43,17 +43,17 @@ class WhatsminerPower(WhatsminerEntity, NumberEntity):
             raise HomeAssistantError(str(err)) from err
         async with self.coordinator.command_lock:
             if not self.available:
-                raise HomeAssistantError("Нет свежих данных о заданной мощности майнера")
+                raise HomeAssistantError("No fresh configured power reading is available")
             if self.native_value == watts:
                 return  # Avoid unnecessary flash writes.
             try:
                 await self.coordinator.client.set_power(watts, config[CONF_ACCOUNT], config[CONF_PASSWORD])
             except APIError as err:
                 if err.code == -4:
-                    raise HomeAssistantError("WhatsMiner отказал в доступе: проверьте API Write, учётную запись и пароль") from err
-                raise HomeAssistantError(f"Команда мощности отклонена: код {err.code}") from err
+                    raise HomeAssistantError("WhatsMiner denied access: check API Write, account and password") from err
+                raise HomeAssistantError(f"Power command rejected: code {err.code}") from err
             except WhatsminerError as err:
-                raise HomeAssistantError("Ответ не получен. Команда могла выполниться; проверьте заданную мощность перед повтором") from err
+                raise HomeAssistantError("No response received. The command may have succeeded; check configured power before retrying") from err
             await self.coordinator.async_request_refresh()
 
 
@@ -66,7 +66,7 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
     _attr_icon = "mdi:percent"
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "power-percent", "Установка процента мощности")
+        super().__init__(coordinator, "power-percent", "Set power percentage")
         self._attr_unique_id += "_control"
         self._attr_native_min_value = coordinator.config.get(CONF_PERCENT_MIN, DEFAULT_PERCENT_MIN)
 
@@ -92,21 +92,21 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
         try:
             percent = validate_power(value, int(self.native_min_value), 100)
         except ValueError as err:
-            raise HomeAssistantError("Процент вне разрешённых границ или не является целым числом") from err
+            raise HomeAssistantError("Power percentage must be an integer within the configured limits") from err
         config = self.coordinator.config
         async with self.coordinator.command_lock:
             if not self.available:
-                raise HomeAssistantError("Нет связи с майнером")
+                raise HomeAssistantError("The miner is unavailable")
             # Only block while explicitly reported as tuning. Some firmware omits the flag.
             if self.coordinator.data.get("up-freq-finish") == 0:
-                raise HomeAssistantError("Дождитесь завершения подбора частот")
+                raise HomeAssistantError("Wait until frequency tuning has finished")
             if self.native_value == percent:
                 return
             try:
                 await self.coordinator.client.set_power_percent(
                     percent, self.coordinator.percent_mode, config[CONF_ACCOUNT], config[CONF_PASSWORD])
             except APIError as err:
-                raise HomeAssistantError(f"Команда процента мощности отклонена: код {err.code}") from err
+                raise HomeAssistantError(f"Power percentage command rejected: code {err.code}") from err
             except WhatsminerError as err:
-                raise HomeAssistantError("Ответ не получен; проверьте настройку перед повтором команды") from err
+                raise HomeAssistantError("No response received; check the setting before retrying the command") from err
             await self.coordinator.async_request_refresh()

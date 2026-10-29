@@ -1,32 +1,63 @@
-# Индивидуальные температуры из WEB
+# Individual chip data from the web interface
 
-**Статус 0.2.0:** транспорт GET, авторизация Basic/Cookie, контракт JSON, сущности чипов и карточка реализованы и проверены на синтетических ответах. Реальный endpoint, формат и вход в WEB конкретной прошивки пока не подтверждены. Это универсальный экспериментальный адаптер, а не готовый драйвер веб-интерфейса всех WhatsMiner.
+Version **0.3.0** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **The actual device response has not yet been captured or verified.**
 
-Для завершения драйвера нужны модель, версия прошивки и фактический ответ запроса, из которого веб-интерфейс рисует индивидуальные температуры.
+## Known endpoint
 
-## Как найти источник
+The supplied endpoint path is:
 
-На компьютере откройте веб-интерфейс майнера и страницу, где видны температуры **каждого** U1/U2/…:
-
-1. Нажмите F12 → **Network / Сеть** → **Fetch/XHR**.
-2. Обновите страницу или нажмите обновление температур.
-3. Выберите запрос, в **Response / Ответе** которого перечислены отдельные чипы и температуры.
-4. Сохраните путь запроса, метод GET/POST и его JSON-ответ. Пришлите ответ и снимок таблицы чипов, а не полный HAR.
-5. Перед отправкой уберите пароли, Cookie, Authorization, токены сессии, адреса кошельков и работников, если они встретились в ответе/URL. Пароль для реализации парсера не нужен.
-
-Если запросов Fetch/XHR нет, данные могут приходить в HTML или WebSocket. Нужен исходный фрагмент HTML с измерениями либо формат сообщения WebSocket. Текущая версия их автоматически не разбирает; по образцу можно добавить соответствующий адаптер.
-
-Если WEB показывает только одну температуру или min/avg/max на плату, это не источник температур каждого чипа. Восстановить из такой статистики индивидуальные показания невозможно.
-
-Для краткого анализа структуры сохранённого JSON без печати строковых значений:
-
-```powershell
-py tools\inspect_web_response.py response.json
+```text
+https://MINER_IP/cgi-bin/luci/admin/status/btminerapi
 ```
 
-## Текущий контракт адаптера
+New web configuration forms prefill HTTPS, port 443 and `/cgi-bin/luci/admin/status/btminerapi`. The host is taken from the configured miner, rather than embedded in source. Existing explicitly configured protocol, port and path values are preserved.
 
-Пока поддерживается следующий **внутренний формат**, выбранный для интеграции. Это не утверждение о формате WhatsMiner:
+This private device is not reachable from the development environment. A URL identifies where to request data, but does not supply the response body, session or firmware-specific format.
+
+## Save the response for verification
+
+On a computer that can reach the miner:
+
+1. Sign in to the miner's web interface and open the `btminerapi` URL.
+2. Press **F12 → Network**, select **All**, and reload the page.
+3. Select the request named **btminerapi**. It may be a **Document**, not a Fetch/XHR request.
+4. Open **Response**. Right-click the request and choose **Copy → Copy response**.
+5. Save that text as `btminerapi.html` or `btminerapi.txt` and attach it for parser verification. If copying the response is inconvenient, save the page's original HTML source.
+6. Include the miner model and firmware version. Do not include passwords, cookies, Authorization headers or session tokens. Do not export a full authenticated HAR.
+
+The contents of the visible syslog text area are also sufficient if they contain complete `slot:` headers and chip records. Keep at least one complete board's records so the 172-chip count can be checked.
+
+A screenshot helps with layout, but the actual text or HTML is needed to verify parsing. Captured device responses must be sanitized before being committed; repository tests use synthetic data only.
+
+## Supported LuCI log shape
+
+The HTML adapter extracts only **`textarea#syslog`**. Its contents, or a direct text response, contain records shaped like this synthetic example:
+
+```text
+slot: 0, freq: 700, temp: 70, step: 1
+C0 freq:700 vol:1200 temp:91.3 nonce:123 err:0
+C1 freq:700 vol:1200 temp:92.1 nonce:456 err:0
+```
+
+Each chip remains attached to its explicit slot. The parser preserves source IDs such as `C0`; it does not shift numbering to `U1`. Board `temp` values are not substituted for chip `temp` values. Missing or invalid chip measurements become missing readings, not zero. Duplicate chip identities or board slots are rejected.
+
+The parser accepts whitespace variations and HTML-escaped textarea content. A login page, missing/truncated syslog textarea or unsupported response does not produce false temperatures. Leave **JSON Pointer blank** for HTML or plain text.
+
+A public client using this same page and log format is documented [here](https://github.com/HashSource/whatsminer_chip_map/blob/master/src/api.rs). The Python adapter uses its own HTMLParser-based extraction and field validation; no third-party runtime code is bundled.
+
+## Authentication and HTTPS
+
+Select **luci** to use web username/password credentials. The client first reads the data page. If authentication is required, it posts the credentials to the same miner's `/cgi-bin/luci`, then retries the data read once. It uses an isolated cookie jar per miner that accepts cookies for IP-address hosts. An expired session is renewed on the next read; a failed login is not repeatedly retried in a loop.
+
+Other supported choices are **none**, **basic** and **cookie**. The cookie option uses an explicitly supplied session cookie without automatic renewal. API and web passwords are separate. Blank secret fields in the options flow preserve existing values.
+
+HTTPS certificate verification is **enabled by default**. If the trusted local miner uses a self-signed certificate, explicitly uncheck **Verify HTTPS certificate** in the web options. An HTTPS certificate failure is reported as `web_tls_error`; the integration never disables verification automatically. Ordinary redirects are not followed, and login credentials are sent only to the configured miner.
+
+Only data GET requests and the LuCI authentication POST are used. This web client does not send miner configuration or power commands. Digest, Bearer authentication, WebSocket data and arbitrary POST-based data endpoints are not implemented.
+
+## Normalized JSON
+
+The fallback JSON contract is an integration format; it is not claimed to be the firmware's native JSON schema:
 
 ```json
 {
@@ -34,34 +65,24 @@ py tools\inspect_web_response.py response.json
     {
       "slot": 0,
       "chips": [
-        {"id": "U1", "temperature": 91.3},
-        {"id": "U2", "temperature": null}
+        {"id": "C0", "temperature": 91.3},
+        {"id": "C1", "temperature": null}
       ]
     }
   ]
 }
 ```
 
-При вложенном ответе можно указать JSON Pointer, например `/data` для объекта `{"data":{"boards":[...]}}`. Когда получим реальный ответ, добавим адаптер его полей к этому контракту без промежуточного MQTT или сервера.
+For a nested response, configure a JSON Pointer such as `/data` for `{"data":{"boards":[...]}}`. Optional zero-based integer `row` and `column` fields describe explicit positions, whose physical accuracy must be checked.
 
-`slot` — явный номер платы; `id` — фактический идентификатор чипа. Отсутствующее/нечисловое измерение становится `null`, не нулём. Повторяющиеся идентификаторы и позиции отвергаются, чтобы показания не сместились на другой чип.
+`tools/inspect_web_response.py response.json` summarizes a saved JSON schema without printing string values or authentication headers. It is a JSON inspection tool; use the saved HTML/text directly when inspecting LuCI.
 
-Опциональные целые `row` и `column` (индексация с 0) передаются в карту. Их физическое соответствие плате нужно подтвердить. Если геометрия неизвестна, эти поля не добавляются.
+## Entities and availability
 
-## Настройка
+After a successful response:
 
-В опциях включите «Получать температуры отдельных чипов из WEB». Укажите протокол, порт, **наблюдённый относительный путь GET-запроса**, JSON Pointer при необходимости и способ авторизации. Адрес ограничен тем же хостом, что и API майнера. Переадресации не выполняются.
+- **Board N web chip map** reports the maximum individual chip temperature. Its `chips` attribute contains IDs and measurements, with `updated_at` and `chip_count` metadata.
+- Individual chip sensors are created disabled by default. Enable selected sensors for history or automations.
+- **Web chip data status** reports `ok` or a sanitized failure reason.
 
-Поддерживается открытый GET, HTTP Basic и явно заданный Cookie сеанса. WEB-пароль не смешивается с паролем API. Пустые секретные поля при изменении опций сохраняют предыдущие значения. Полный адрес не публикуется в диагностике.
-
-Переход на login, 401/403 и HTML вместо JSON вызывают ошибку получения, а не ложные температуры. Cookie не обновляется автоматически. Вход LuCI, Digest, авторизация Bearer, запросы POST и WebSocket требуют реализации по подтверждённому образцу прошивки.
-
-## Сущности
-
-После первого правильного ответа появляются:
-
-- датчик **«Плата N карта чипов WEB»**: состояние — максимальная индивидуальная температура, атрибут `chips` — все ID и измерения платы, `updated_at` — время получения;
-- отдельные датчики каждого чипа — по умолчанию выключены в реестре. Включите нужные для истории или автоматизаций;
-- **«Получение чипов WEB»**: `ok` или краткая причина ошибки.
-
-Карточка использует атрибуты одной сущности на плату. Массивы чипов не записываются в Recorder как атрибуты; историю выбранных чипов можно вести отдельными включёнными сущностями. Историческая анимация HeatMap пока не реализована.
+A web failure invalidates chip entities and maps without dropping valid API telemetry. Chip arrays and update timestamps are excluded from Recorder attributes; enable specific chip sensors for individual history. Historical heatmap playback is not implemented.

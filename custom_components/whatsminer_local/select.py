@@ -16,7 +16,7 @@ class WhatsminerPercentMode(WhatsminerEntity, SelectEntity):
     _attr_icon = "mdi:speedometer"
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "percent-adjustment-mode", "Режим изменения процента мощности")
+        super().__init__(coordinator, "percent-adjustment-mode", "Power percentage adjustment mode")
 
     @property
     def available(self):

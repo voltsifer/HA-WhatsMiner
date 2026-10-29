@@ -26,17 +26,18 @@
         }
       },
       "web": {
-        "title": "Individual chip WEB data",
-        "description": "Experimental JSON adapter. Enter an observed GET endpoint and the contract in WEB_CHIPS.md. Your firmware endpoint/schema is not yet verified. No automatic HTML parsing or LuCI login. WEB credentials are separate; blank secret fields preserve existing values.",
+        "title": "Individual chip web data",
+        "description": "Read the LuCI btminerapi syslog page or a normalized JSON endpoint. The default path uses HTTPS on port 443. LuCI authentication uses separate web credentials and renews the session when needed. Leave JSON Pointer blank for HTML or text. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Blank secret fields preserve existing values.",
         "data": {
-          "web_protocol": "WEB protocol",
-          "web_port": "WEB port",
+          "web_protocol": "Web protocol",
+          "web_port": "Web port",
           "web_path": "Observed GET path starting with /",
           "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
-          "web_auth": "WEB authentication",
-          "web_username": "WEB username",
-          "web_password": "WEB password",
-          "web_cookie": "WEB session cookie"
+          "web_auth": "Web authentication (luci, none, basic, cookie)",
+          "web_username": "Web username",
+          "web_password": "Web password",
+          "web_cookie": "Web session cookie",
+          "web_verify_ssl": "Verify HTTPS certificate"
         }
       }
     },
@@ -77,17 +78,18 @@
         }
       },
       "web": {
-        "title": "Individual chip WEB data",
-        "description": "Experimental JSON adapter. Enter an observed GET endpoint and the contract in WEB_CHIPS.md. Your firmware endpoint/schema is not yet verified. No automatic HTML parsing or LuCI login. WEB credentials are separate; blank secret fields preserve existing values.",
+        "title": "Individual chip web data",
+        "description": "Read the LuCI btminerapi syslog page or a normalized JSON endpoint. The default path uses HTTPS on port 443. LuCI authentication uses separate web credentials and renews the session when needed. Leave JSON Pointer blank for HTML or text. Certificate verification is enabled by default; disable it only for a trusted local miner with a self-signed certificate. Blank secret fields preserve existing values.",
         "data": {
-          "web_protocol": "WEB protocol",
-          "web_port": "WEB port",
+          "web_protocol": "Web protocol",
+          "web_port": "Web port",
           "web_path": "Observed GET path starting with /",
           "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
-          "web_auth": "WEB authentication",
-          "web_username": "WEB username",
-          "web_password": "WEB password",
-          "web_cookie": "WEB session cookie"
+          "web_auth": "Web authentication (luci, none, basic, cookie)",
+          "web_username": "Web username",
+          "web_password": "Web password",
+          "web_cookie": "Web session cookie",
+          "web_verify_ssl": "Verify HTTPS certificate"
         }
       }
     },
