@@ -7,8 +7,8 @@ The heatmap is a dashboard card; it does not automatically create a dashboard or
 The JavaScript is installed with the integration, including HACS installations. After installing and restarting Home Assistant:
 
 1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
-2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.5.1`**, type **JavaScript module**.
-3. Reload the browser. Update the URL version parameter or clear the browser cache after upgrading the card.
+2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js`**, type **JavaScript module**. Use this permanent URL without a version query parameter.
+3. Reload the browser. After integration upgrades, restart Home Assistant and reload the dashboard page; the resource URL stays unchanged. If an old card remains cached, perform a hard refresh or clear the frontend cache. An already open page keeps its loaded JavaScript until it is reloaded.
 4. Open your dashboard, select **Edit → Add card → Manual**, and use the actual entity IDs of your **Board N web chip map** sensors. Find those IDs under **Developer tools → States** or the miner device page. Individual chip temperature sensors can remain disabled:
 
 ```yaml
@@ -24,6 +24,8 @@ max_temperature: 110
 ```
 
 List only boards that actually exist. The integration does not assume three boards. `columns` controls the logical grid width, not physical board geometry. A board with 172 readings produces 172 chip cells, including cells whose readings are missing. The 70–110°C values define only the color scale, not recommended operating limits.
+
+If you previously registered a URL ending in `?v=...`, edit that existing resource once and remove the query parameter. Do not add a duplicate resource. The unversioned path is already supported by the integration; no new integration release is required for this URL change. The static resource is registered with Home Assistant's long-lived cache headers disabled.
 
 ## Display
 

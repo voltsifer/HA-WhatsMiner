@@ -34,6 +34,8 @@ Repository: **https://github.com/voltsifer/HA-WhatsMiner**.
 
 Start with power control and web chip data disabled, then compare API telemetry with the miner's interface. HACS installs the heatmap JavaScript with the integration; a second dashboard repository is unnecessary. See [HEATMAP.md](HEATMAP.md) for resource registration.
 
+Register the card once at `/ha-whatsminer/ha-whatsminer-heatmap-card.js` as a JavaScript module. This URL stays the same across releases. After an integration update and HA restart, reload the dashboard page to load the updated card. A version query parameter is not required.
+
 ### Manual installation and upgrades
 
 Place `custom_components/whatsminer_local` at `/config/custom_components/whatsminer_local`, then restart Home Assistant. Replace the integration directory when upgrading manually so removed translation files are not left behind. The internal domain remains `whatsminer_local` to preserve integration identity.
