@@ -100,6 +100,13 @@ class TestProtocol(unittest.IsolatedAsyncioTestCase):
             request = json.loads(await reader.readexactly(length))
             self.requests.append(request)
             cmd = request['cmd']
+            if cmd.startswith('set.') and self.mode == 'write_timeout':
+                await reader.read()
+                return
+            if cmd.startswith('set.') and self.mode in ('write_truncated', 'write_badjson'):
+                writer.write(struct.pack('<I', 99 if self.mode == 'write_truncated' else 1) + b'{')
+                await writer.drain()
+                return
             if self.mode == 'timeout':
                 await reader.read()
                 return
@@ -118,7 +125,7 @@ class TestProtocol(unittest.IsolatedAsyncioTestCase):
             msg = {'get.device.info': SNAPSHOT['info'], 'get.miner.status': SNAPSHOT['status'],
                    'get.miner.setting': SNAPSHOT['setting']}.get(cmd, 'ok')
             if cmd == 'get.device.info' and request.get('param') == 'salt':
-                msg = {'salt': 'QbVy1Ou3'}
+                msg = {} if self.mode == 'missing_salt' else {'salt': 'QbVy1Ou3'}
             code = -4 if cmd.startswith('set.') and self.mode == 'denied' else 0
             if self.mode == 'old_setting' and cmd == 'get.miner.setting':
                 code = -2
@@ -171,6 +178,31 @@ class TestProtocol(unittest.IsolatedAsyncioTestCase):
             await self.client.set_power(2500, 'super', 'password')
         self.assertEqual(ctx.exception.code, -4)
         self.assertEqual(len(self.requests), 2)
+
+    async def test_authentication_transport_failure_prevents_write(self):
+        for mode in ('timeout', 'badjson', 'missing_salt'):
+            with self.subTest(mode=mode):
+                self.requests.clear()
+                self.mode = mode
+                with self.assertRaises(api.CommandTransportError) as ctx:
+                    await self.client.set_power_percent(80, 'fast', 'super', 'secret')
+                self.assertEqual(ctx.exception.stage, 'authentication')
+                self.assertEqual(len(self.requests), 1)
+                self.assertTrue(all(r['cmd'].startswith('get.') for r in self.requests))
+
+    async def test_write_transport_failure_identifies_timeout_closed_socket_or_json(self):
+        for mode, expected in (('write_timeout', 'Timed out while waiting'),
+                               ('write_truncated', 'closed the connection'),
+                               ('write_badjson', 'Invalid JSON response')):
+            with self.subTest(mode=mode):
+                self.requests.clear()
+                self.mode = mode
+                with self.assertRaises(api.CommandTransportError) as ctx:
+                    await self.client.set_power_percent(80, 'fast', 'super', 'secret')
+                self.assertEqual(ctx.exception.stage, 'write')
+                self.assertIn(expected, str(ctx.exception))
+                self.assertEqual(len(self.requests), 2)
+                self.assertEqual(sum(r['cmd'].startswith('set.') for r in self.requests), 1)
 
     async def test_percent_failure_keeps_reason_without_credentials_or_retry(self):
         self.mode = 'percent_rejected'

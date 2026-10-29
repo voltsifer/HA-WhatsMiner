@@ -4,7 +4,7 @@ from homeassistant.const import CONF_PASSWORD, PERCENTAGE, UnitOfPower
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
-from .api import APIError, WhatsminerError, validate_power
+from .api import APIError, CommandTransportError, WhatsminerError, validate_power
 from .const import (
     CONF_ACCOUNT, CONF_CONTROL, CONF_MAX, CONF_MIN, CONF_PERCENT_MIN,
     CONF_PERCENT_MODE, DEFAULT_PERCENT_MIN, DOMAIN,
@@ -138,9 +138,26 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
                     f"Power percentage command rejected: code {err.code}, percent {percent}, mode {mode}."
                     + explanation + hint) from err
             except WhatsminerError as err:
-                command.update(status="unknown", reason="No response received; the command may have succeeded")
+                stage = err.stage if isinstance(err, CommandTransportError) else "write"
+                command.update(status="not_sent" if stage == "authentication" else "unknown",
+                               transport_stage=stage, reason=str(err))
                 self.async_write_ha_state()
-                raise HomeAssistantError("No response received; check the setting before retrying the command") from err
+                if stage == "authentication":
+                    raise HomeAssistantError(
+                        f"Power percentage command was not sent: authentication preparation failed. {err}") from err
+                # Read only: a missing acknowledgement must never trigger a second write.
+                await self.coordinator.async_request_refresh()
+                reported = (self.coordinator.data.get("power-percent")
+                            if self.coordinator.last_update_success else None)
+                command["reported_percent_after_error"] = reported
+                command["verification"] = ("unavailable" if reported is None else
+                                           "matches_request" if reported == percent else "different")
+                self.async_write_ha_state()
+                verification = ("The read-back percentage is unavailable." if reported is None else
+                                f"The miner now reports {reported:g}%.")
+                raise HomeAssistantError(
+                    f"Power percentage command has no confirmed acknowledgement: {err}. "
+                    f"{verification} The command was not retried.") from err
             command.update(status="accepted")
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()

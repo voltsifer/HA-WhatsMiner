@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.5.0** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
+Version **0.5.1** uses a built-in LuCI `btminerapi` profile. The parser accepts the HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
 
 ## Known endpoint
 
@@ -119,3 +119,11 @@ template:
 ```
 
 No `total_increasing` state class is assigned because firmware counter reset semantics have not been verified. This template is unavailable if that chip's temperature sensor is unavailable; the board's `chips` attribute can still retain other valid metrics when temperature is missing. Diagnostics include the normalized chip boards without raw HTML or credentials.
+
+## Enable chip entities and inspect metrics
+
+Individual chip temperature sensors are disabled by default by design. Upgrade/reload does not override entity choices previously made by the user. To enable all selected entities, open **Settings → Devices & services → Entities**, filter by **HA-WhatsMiner** (and the required miner device) and **Status: Disabled**, enter selection mode, select the entities, then choose **Action → Enable selected**. Wait for entity loading or reload the integration if requested by HA. Do not edit `.storage` manually.
+
+The heatmap needs only the enabled **Board N web chip map** sensors, not all 516 individual temperature sensors. Reading the web page and collecting optional metrics also do not depend on those individual sensors being enabled.
+
+To inspect additional metrics, open **Developer tools → States**, select a **Board N web chip map** sensor and inspect `chips`. Each item contains its ID, temperature and the available optional metric fields listed above. An enabled individual chip temperature sensor exposes those metrics as attributes. No separate per-chip voltage/frequency/error entities are created. If a firmware field is absent, it is omitted; invalid values are null. Missing source fields cannot be enabled into existence.

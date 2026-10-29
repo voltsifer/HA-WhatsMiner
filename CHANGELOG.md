@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Distinguish salt-preparation failures from transport errors during power writes, including timeout, connection closure and invalid JSON.
+- After an unacknowledged percentage write, refresh telemetry using GET commands and report the returned percentage when available. Never retry the write or claim an acknowledgement from read-back alone.
+- Document bulk entity enabling, optional metrics in chip attributes, and manual HeatMap resource/card setup.
+- Keep existing API timeout, token algorithm and user entity choices unchanged.
+- Pass 67 automated tests (56 Python, 11 JavaScript).
+
 ## 0.5.0
 
 - Simplify web setup to username, password and HTTPS certificate verification. Use HTTPS:443, the built-in btminerapi path and LuCI login automatically.

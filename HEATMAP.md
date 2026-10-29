@@ -1,15 +1,15 @@
 # Chip heatmap card
 
-The card requires individual chip readings from the web adapter. API board minimum/average/maximum statistics are insufficient to reconstruct individual temperatures.
+The heatmap is a dashboard card; it does not automatically create a dashboard or appear as a full map on the miner device page. The card requires individual chip readings from the web adapter. API board minimum/average/maximum statistics are insufficient to reconstruct individual temperatures.
 
 ## Register the resource
 
 The JavaScript is installed with the integration, including HACS installations. After installing and restarting Home Assistant:
 
 1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
-2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.5.0`**, type **JavaScript module**.
+2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.5.1`**, type **JavaScript module**.
 3. Reload the browser. Update the URL version parameter or clear the browser cache after upgrading the card.
-4. Add a manual card using the actual entity IDs of your **Board N web chip map** sensors:
+4. Open your dashboard, select **Edit → Add card → Manual**, and use the actual entity IDs of your **Board N web chip map** sensors. Find those IDs under **Developer tools → States** or the miner device page. Individual chip temperature sensors can remain disabled:
 
 ```yaml
 type: custom:ha-whatsminer-heatmap-card
@@ -58,3 +58,9 @@ Use the actual IDs returned by your source. LuCI logs commonly use `C0` and subs
 `null` entries leave empty physical positions. Chips omitted from a configured layout remain visible in a separate section. A layout position whose chip is absent from the response shows a missing reading. If all source chips include explicit `row` and `column` fields, the card can use them, while still asking you to verify the mapping against the board.
 
 `examples/heatmap-demo.html` demonstrates one logical board with 172 chips and synthetic data, without miner requests. Serve the project with `python -m http.server 8000` to open it locally.
+
+## Troubleshooting
+
+- **Custom element does not exist**: verify the JavaScript resource URL and module type, then reload the browser. Installing the integration through HACS does not automatically register this custom dashboard resource.
+- **No fresh chip data**: check that the selected entity is a Board N web chip map sensor, is enabled and available, and exposes a non-empty `chips` attribute. Check Web chip data status for a source/login/certificate failure.
+- **No separate voltage/error entities**: optional chip metrics are attributes of each chip, not additional sensor entities. Select or hover a chip to inspect them. The map color scale remains temperature-only.

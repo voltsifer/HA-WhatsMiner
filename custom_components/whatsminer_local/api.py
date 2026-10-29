@@ -25,6 +25,14 @@ class APIError(WhatsminerError):
         super().__init__(f"WhatsMiner API error {code}" + (f": {reason}" if reason else ""))
 
 
+class CommandTransportError(WhatsminerError):
+    """A sanitized transport failure with its write-sequence stage."""
+
+    def __init__(self, stage: str, reason: str) -> None:
+        self.stage, self.reason = stage, reason
+        super().__init__(reason)
+
+
 def safe_api_reason(message: Any, secrets: tuple[str, ...] = ()) -> str | None:
     """Keep a bounded firmware explanation, never a raw response or credentials."""
     if isinstance(message, dict):
@@ -56,12 +64,15 @@ class WhatsminerClient:
 
     async def _request(self, payload: dict[str, Any], *, secrets: tuple[str, ...] = ()) -> dict[str, Any]:
         writer = None
+        phase = "connecting"
         try:
             async with asyncio.timeout(self.timeout):
                 reader, writer = await asyncio.open_connection(self.host, self.port)
+                phase = "sending the request"
                 body = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("ascii")
                 writer.write(struct.pack("<I", len(body)) + body)
                 await writer.drain()
+                phase = "waiting for the API response"
                 while True:
                     length = struct.unpack("<I", await reader.readexactly(4))[0]
                     if length == 0:  # API heartbeat
@@ -77,8 +88,12 @@ class WhatsminerClient:
                 if response.get("desc") not in (None, payload["cmd"]):
                     raise WhatsminerError("Unexpected response command")
                 return response
-        except (TimeoutError, OSError, asyncio.IncompleteReadError) as err:
-            raise WhatsminerError("Connection failed or timed out") from err
+        except TimeoutError as err:
+            raise WhatsminerError(f"Timed out while {phase}") from err
+        except asyncio.IncompleteReadError as err:
+            raise WhatsminerError("API closed the connection before a complete response was received") from err
+        except OSError as err:
+            raise WhatsminerError(f"Connection failed while {phase}") from err
         except (ValueError, UnicodeError) as err:
             raise WhatsminerError("Invalid JSON response") from err
         finally:
@@ -120,19 +135,29 @@ class WhatsminerClient:
         # Salt and timestamp are fetched immediately before each explicit write.
         # A timed-out write is ambiguous and MUST NOT be automatically retried.
         async with self._lock:
-            response = await self._request({"cmd": "get.device.info", "param": "salt"}, secrets=(password,))
+            try:
+                response = await self._request({"cmd": "get.device.info", "param": "salt"}, secrets=(password,))
+            except APIError:
+                raise
+            except WhatsminerError as err:
+                raise CommandTransportError("authentication", str(err)) from err
             msg = response.get("msg")
             salt = msg.get("salt") if isinstance(msg, dict) else None
             if not isinstance(salt, str) or not salt:
-                raise WhatsminerError("Device did not return an authentication salt")
+                raise CommandTransportError("authentication", "Device did not return an authentication salt")
             timestamp = response.get("when")
             if type(timestamp) is not int:
                 timestamp = int(time.time())
             token = make_token(command, password, salt, timestamp)
-            await self._request({
-                "cmd": command, "ts": timestamp, "account": account,
-                "token": token, "param": param,
-            }, secrets=(password, salt, token))
+            try:
+                await self._request({
+                    "cmd": command, "ts": timestamp, "account": account,
+                    "token": token, "param": param,
+                }, secrets=(password, salt, token))
+            except APIError:
+                raise
+            except WhatsminerError as err:
+                raise CommandTransportError("write", str(err)) from err
 
 
 def numeric(value: Any) -> float | None:

@@ -390,3 +390,46 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await async_migrate_entry(self.hass, entry))
         self.assertEqual(entry.minor_version, 2)
         await self.hass.async_block_till_done()
+
+    async def test_authentication_transport_failure_does_not_claim_command_sent(self):
+        from custom_components.whatsminer_local.api import CommandTransportError
+        entry = await self.add_entry(control=True)
+        entity = next(s for s in self.hass.states.async_all('number') if s.attributes.get('unit_of_measurement') == '%')
+        before = self.client.read_snapshot.await_count
+        self.client.set_power_percent.side_effect = CommandTransportError('authentication', 'Device did not return an authentication salt')
+        with self.assertRaisesRegex(HomeAssistantError, 'was not sent: authentication preparation failed'):
+            await self.hass.services.async_call('number', 'set_value', {'entity_id': entity.entity_id, 'value': 80}, blocking=True)
+        last = self.hass.states.get(entity.entity_id).attributes['last_command']
+        self.assertEqual(last['status'], 'not_sent')
+        self.assertEqual(last['transport_stage'], 'authentication')
+        self.assertEqual(self.client.read_snapshot.await_count, before)
+        self.client.set_power_percent.assert_awaited_once()
+
+    async def test_unacknowledged_write_is_read_back_without_retry(self):
+        import copy
+        from custom_components.whatsminer_local.api import CommandTransportError, WhatsminerError
+        entry = await self.add_entry(control=True)
+        coordinator = self.hass.data[DOMAIN][entry.entry_id]
+        entity = next(s for s in self.hass.states.async_all('number') if s.attributes.get('unit_of_measurement') == '%')
+        self.client.set_power_percent.side_effect = CommandTransportError('write', 'API closed the connection before a complete response was received')
+        for reported, outcome in ((80, 'matches_request'), (95, 'different'), (None, 'unavailable')):
+            with self.subTest(reported=reported):
+                coordinator.async_set_updated_data({**coordinator.data, 'power-percent': None})
+                self.client.set_power_percent.reset_mock()
+                before = self.client.read_snapshot.await_count
+                snapshot = copy.deepcopy(SNAPSHOT)
+                snapshot['setting']['power-percent'] = reported
+                self.client.read_snapshot.return_value = snapshot
+                self.client.read_snapshot.side_effect = WhatsminerError('offline') if reported is None else None
+                with self.assertRaisesRegex(HomeAssistantError, 'no confirmed acknowledgement.*closed the connection') as error:
+                    await self.hass.services.async_call('number', 'set_value', {'entity_id': entity.entity_id, 'value': 80}, blocking=True)
+                self.assertEqual(self.client.read_snapshot.await_count, before + 1)
+                self.client.set_power_percent.assert_awaited_once_with(80, 'normal', 'super', 'secret')
+                last = coordinator.last_power_percent_command
+                self.assertEqual(last['status'], 'unknown')
+                self.assertEqual(last['verification'], outcome)
+                self.assertEqual(last['reported_percent_after_error'], reported)
+                self.assertNotIn('secret', str(await async_get_config_entry_diagnostics(self.hass, entry)))
+                if reported is not None:
+                    self.assertIn(f'now reports {reported}%', str(error.exception))
+                    self.assertEqual(self.hass.states.get(entity.entity_id).state, f'{reported}.0')

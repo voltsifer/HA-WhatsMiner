@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.0**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.1**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -102,6 +102,17 @@ API code **-1** is a generic miner failure, not a diagnosis. The integration sen
 The action error now includes the requested percentage/mode and a sanitized firmware explanation when one is returned. The percentage number entity exposes `last_command`, also included in downloaded diagnostics: requested value, adjustment mode, reported miner work mode, tuning flag, status and API failure code. It contains no configured credentials or authentication token.
 
 For `normal` adjustment, check that tuning has finished and that an air-cooled miner is in Normal/Low Power mode. `fast` is an explicitly selected alternative with different stability/performance behavior; it is never selected automatically after a failure. Check active miner protection errors and verify API Write/account permissions as appropriate. Web LuCI authentication does not control TCP API power-command authentication.
+
+### Unacknowledged power commands
+
+A transport failure does not establish whether the miner applied a power command, and does not prove successful authentication. Version 0.5.1 distinguishes timeout/connection closure/invalid response and records the stage in `last_command`:
+
+- `authentication` with `status: not_sent`: salt preparation failed before a power command was attempted.
+- `write` with `status: unknown`: no valid acknowledgement was obtained for the power request. The integration refreshes telemetry using GET commands only; it never repeats the write.
+
+The action error and `last_command.reported_percent_after_error` show the percentage returned by that refresh when available. `verification` is `matches_request`, `different` or `unavailable`. A matching read-back is an observation, not a fabricated acknowledgement or a guarantee that the setting will remain applied. The API timeout and token algorithm are unchanged.
+
+Download diagnostics from the integration's menu if the issue persists. It includes model, firmware, API version, normalized chip boards and the last percentage command result. Do not send passwords, salt, tokens or an authenticated HAR.
 
 ## Individual chip temperatures
 

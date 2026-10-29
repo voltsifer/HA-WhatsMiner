@@ -1,8 +1,8 @@
-# HA-WhatsMiner 0.5.0 validation
+# HA-WhatsMiner 0.5.1 validation
 
 Date: October 29, 2026.
 
-**52 Python tests and 11 JavaScript tests pass: 63 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**56 Python tests and 11 JavaScript tests pass: 67 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
@@ -58,3 +58,5 @@ Version 0.3.1 added tests for preserved and redacted API failure reasons, no wri
 Version 0.4.0 added optional per-chip metrics, spaced x/pct pair parsing, numeric validation, no cross-chip carryover, chip/map/diagnostics propagation, missing-temperature availability, selected-chip DOM details and the fast-mode password-error hint. The supplied device HTML was rechecked: all 516 chip records include the expected additional fields.
 
 Version 0.5.0 adds a three-field web form, fixed HTTPS:443 LuCI endpoint, automatic API port 4433 for new entries, and migration tests removing obsolete options while preserving API/web credentials, explicit TLS choice, entity identities and legacy API ports. Form, migration and reload operations issue no power commands. The API token and request algorithm are unchanged; super/admin credential guidance is based on the manufacturer operation guide.
+
+Version 0.5.1 adds staged transport errors and a read-only telemetry refresh after an unacknowledged percentage write. Tests distinguish authentication preparation from a write timeout, truncated response or invalid JSON, and verify matching/different/unavailable read-back with exactly one write attempt.
