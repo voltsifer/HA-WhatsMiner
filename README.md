@@ -1,10 +1,10 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.2**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.5.3**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
-Power control and API telemetry are implemented. Individual chip temperatures can be read from a LuCI `btminerapi` HTML page, its plain-text log, or a normalized JSON endpoint. The parser has also been checked against a supplied device HTML response: three boards with 172 chips each were read successfully. Live login, power commands and installation on the user's hardware still require device-side validation.
+Power control and API telemetry are implemented. Individual chip temperatures can be read from a LuCI `btminerapi` HTML page, its plain-text log, or a normalized JSON endpoint. The parser has also been checked against a supplied device HTML response: three boards with 172 chips each were read successfully. The user has confirmed live telemetry and HeatMap operation in HAOS on an M60VK2A. Power writes still require device-side validation.
 
 ![Synthetic heatmap example: one board with 172 chips](examples/heatmap-demo.png)
 
@@ -19,6 +19,7 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
 - Built-in HTTPS/LuCI chip-data profile with session login and renewal; only web credentials and certificate verification are configured.
 - A heatmap card with automatic board discovery, chip IDs, temperatures, statistics, median deviations and explicit board layouts.
+- An opt-in M60VK2A layout reconstructed from board photographs, with visible unverified WEB-to-PCB mapping labels.
 - One independently identifiable temperature sensor per chip, disabled by default in the entity registry. The card does not require these sensors to be enabled.
 - Multiple miners and dynamic board/chip discovery. Tested with **172 chips per board**; no fixed board count is assumed.
 
@@ -136,11 +137,11 @@ LuCI credentials are separate from API credentials. Certificate verification is 
 
 Upgrade to 0.5.0 removes legacy endpoint, HTTP/Basic/Cookie, JSON Pointer and cookie options from saved entries. Web username/password and the certificate-verification choice are preserved. Old custom web endpoints are replaced by this fixed profile. Existing custom API ports are retained internally for compatibility; new connections use 4433.
 
-The supplied path is known, but the private device cannot be reached from this development environment. A supplied page response has been successfully parsed as three 172-chip boards. Live retrieval from this private device has not been verified. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
+The supplied path is known, but the private device cannot be reached from this development environment. A supplied page response has been successfully parsed as three 172-chip boards. The user has reported working live chip retrieval; this development environment cannot independently reach the private device. See [WEB_CHIPS.md](WEB_CHIPS.md) for capture instructions, supported formats and authentication behavior.
 
 ## Heatmap
 
-See [HEATMAP.md](HEATMAP.md). The live card uses actual individual chip data. Without confirmed coordinates it displays a clearly labelled **logical grid**, which does not imply physical adjacency on the board.
+See [HEATMAP.md](HEATMAP.md). The live card uses actual individual chip data. The default is a clearly labelled **logical grid**, which does not imply physical adjacency. To inspect the reconstructed M60VK2A profile, add `layout: m60vk2a` to the card; its C-to-U mapping remains explicitly unverified. A complete example is in [examples/m60vk2a-heatmap.yaml](examples/m60vk2a-heatmap.yaml). The same guide explains how to exclude chip data from InfluxDB while keeping HeatMap live.
 
 Run the synthetic 172-chip demo locally:
 

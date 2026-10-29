@@ -142,3 +142,46 @@ test('Explicit selection stays scoped and invalid mixed discovery configuration 
   assert.throws(() => card.setConfig({auto_discover: 'true'}), /must be true or false/);
   assert.throws(() => card.setConfig({auto_discover: false}), /Specify web chip map/);
 });
+
+test('Opt-in M60VK2A card preserves source readings and shows assumed PCB labels with an unverified mapping warning', () => {
+  const card = makeCard([{id: 'C0', temperature: 73, voltage_raw: 275, errors: 3},
+                         {id: 'C171', temperature: 81, crc_errors: 0}], {layout: 'm60vk2a'});
+  const root = card.shadowRoot;
+  assert.equal(root.querySelectorAll('.chip').length, 172);
+  assert.equal(root.querySelectorAll('.missing').length, 170);
+  const cells = [...root.querySelectorAll('.chip')];
+  const zero = cells.find(cell => cell.querySelector('.chipid').textContent === 'C0');
+  const last = cells.find(cell => cell.querySelector('.chipid').textContent === 'C171');
+  assert.ok(zero);
+  assert.ok(last);
+  assert.match(zero.textContent, /C0.*U1/s);
+  assert.equal(zero.style.gridRow, '6');
+  assert.equal(zero.style.gridColumn, '22');
+  assert.equal(last.style.gridRow, '1');
+  assert.equal(last.style.gridColumn, '21');
+  assert.match(root.querySelector('.placement').textContent, /unverified/i);
+  assert.match(root.textContent, /C0\s*(?:→|->|=|to)\s*U1/);
+  assert.match(root.textContent, /unverified/i);
+  const tracks = root.querySelector('.grid').style.gridTemplateRows.match(/minmax\([^)]+\)|[\d.]+px/g);
+  assert.equal(tracks.length, 9);
+  assert.equal(tracks[4], '24px');
+  zero.click();
+  assert.match(root.querySelector('.details').textContent, /C0/);
+  assert.match(root.querySelector('.details').textContent, /73\.0/);
+  assert.match(root.querySelector('.details').textContent, /assumed PCB U1/i);
+  assert.match(root.querySelector('.details').textContent, /Voltage \(raw\): 275.*Errors: 3/);
+  last.click();
+  assert.match(root.querySelector('.details').textContent, /C171/);
+  assert.match(root.querySelector('.details').textContent, /81\.0/);
+  assert.match(root.querySelector('.details').textContent, /assumed PCB U172/i);
+  assert.match(root.querySelector('.details').textContent, /CRC errors: 0/);
+});
+
+test('Physical candidate is opt-in and invalid profile configuration is rejected', () => {
+  const card = makeCard([{id: 'C0', temperature: 73}]);
+  assert.equal(card.shadowRoot.querySelectorAll('.chip').length, 1);
+  assert.ok(!/assumed PCB/.test(card.shadowRoot.textContent));
+  assert.ok(!Object.hasOwn(card.constructor.getStubConfig(), 'layout'));
+  assert.throws(() => card.setConfig({entity: id, layout: 'unknown-board'}));
+  assert.throws(() => card.setConfig({entity: id, layout: 'm60vk2a', layouts: {'0': [['C0']]}}));
+});

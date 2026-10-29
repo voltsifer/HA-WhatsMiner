@@ -1,0 +1,9 @@
+# Photo-based M60VK2A reconstruction; WEB-to-PCB numbering is unverified.
+# Assumes Cn -> U(n+1). The card displays the mapping warning.
+# The preset supplies its own 22-column arrangement.
+type: custom:ha-whatsminer-heatmap-card
+title: M60VK2A chip temperatures
+auto_discover: true
+layout: m60vk2a
+min_temperature: 60
+max_temperature: 100

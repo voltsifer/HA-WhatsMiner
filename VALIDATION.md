@@ -1,8 +1,8 @@
-# HA-WhatsMiner 0.5.2 validation
+# HA-WhatsMiner 0.5.3 validation
 
 Date: October 29, 2026.
 
-**56 Python tests and 16 JavaScript tests pass: 72 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**56 Python tests and 21 JavaScript tests pass: 77 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
@@ -14,13 +14,13 @@ Date: October 29, 2026.
 | LuCI authentication | Local server; login form POST, IP-address cookies, session reuse, expired-cookie renewal and no repeated login loop after rejected credentials |
 | HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
 | Session cleanup | Isolated per-miner cookie session is detached on unload without closing Home Assistant's shared connector |
-| Heatmap calculations | Four Node.js tests for values, color scales, mapping and missing data |
-| Heatmap DOM | Twelve happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
+| Heatmap calculations | Seven Node.js tests for values, color scales, mapping, missing data and reconstructed profile identities |
+| Heatmap DOM | Fourteen happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
 | Project language | English labels, documentation and regenerated artwork; CI rejects Cyrillic text and removed language files |
 | Supplied device HTML | Parsed successfully: 3 boards × 172 chips, IDs C0–C171, no missing temperatures; raw private page is not included in the repository |
-| Actual miner operations | Live login, retrieval and power commands remain unverified on the user's private network |
-| Physical chip placement | Not verified; the demo grid is logical, not a model-specific board diagram |
-| Installation in the user's HAOS | Not verified; source is prepared for HACS custom repository installation |
+| Actual miner operations | The user reports live telemetry and HeatMap working in HAOS; power writes remain unconfirmed |
+| Physical chip placement | M60VK2A profile reconstructed from photographed PCB labels; some positions, alignment and WEB Cn to PCB U(n+1) correspondence remain unverified |
+| Installation in the user's HAOS | The user reports working installation; the development environment cannot independently access that HAOS instance |
 | Full browser rendering | DOM checks performed; a complete Chromium visual test was unavailable in the environment |
 
 API and web tests use local emulators or mocked device responses. They do not establish hardware operating limits or guarantee compatibility with every firmware revision.
@@ -62,3 +62,5 @@ Version 0.5.0 adds a three-field web form, fixed HTTPS:443 LuCI endpoint, automa
 Version 0.5.1 adds staged transport errors and a read-only telemetry refresh after an unacknowledged percentage write. Tests distinguish authentication preparation from a write timeout, truncated response or invalid JSON, and verify matching/different/unavailable read-back with exactly one write attempt.
 
 Version 0.5.2 adds HeatMap discovery tests for three 172-chip boards without entity IDs, renamed/new/removed/unavailable sources, explicit selection across multiple miners, invalid mixed configuration, empty-state instructions and placeholder-free card picker defaults. Browser code uses only existing HA state data and sends no miner requests.
+
+Version 0.5.3 adds M60VK2A tests for all 172 unique IDs, photographed numbering anchors, the two board sections and reserved central gap, preserved source values and metrics, missing chips, visible mapping uncertainty and assumed PCB references, incompatible/duplicate identity rejection and opt-in configuration. The reconstruction is independently derived from the supplied photographs; no third-party implementation or private photo/serial data is shipped. Tests validate layout completeness and behavior, not the unverified hardware identity correspondence.

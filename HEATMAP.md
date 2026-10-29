@@ -52,9 +52,52 @@ The card does not infer missing temperatures from neighbors. A statistical tempe
 
 All card labels and error messages are English. Existing Home Assistant entity IDs and customized names remain under HA's entity registry control.
 
+## Exclude chip data from InfluxDB
+
+HeatMap uses live Home Assistant states, so chip entities can remain enabled while their export to InfluxDB is excluded. Merge these filters into your existing `influxdb:` section in `configuration.yaml`; do not add a second section or replace your connection settings:
+
+```yaml
+influxdb:
+  exclude:
+    entity_globs:
+      - sensor.*_chip_*_web_temperature
+      - sensor.*_web_chip_map
+```
+
+These patterns target the default individual chip and board-map entity IDs. Check the actual IDs under **Developer tools → States**. For renamed entities that no longer match, add their actual IDs to `exclude.entities`.
+
+Existing `include.entities` entries and matching `include.entity_globs` take priority over these exclusion globs. Remove or narrow conflicting include rules. The integration's Recorder `_unrecorded_attributes` setting is separate and does not act as an InfluxDB entity filter.
+
+Validate the Home Assistant configuration, then restart Home Assistant to apply the YAML changes. Verify that HeatMap still updates and that no new points arrive for the excluded entities. Previously stored InfluxDB data is unaffected. See the official [InfluxDB configuration and filter documentation](https://www.home-assistant.io/integrations/influxdb/).
+
 ## Physical layout
 
 Without verified geometry, the card explicitly labels its arrangement as a **logical grid**. Response order does not establish a chip's physical location.
+
+### M60VK2A preset
+
+Version 0.5.3 adds an optional, photo-based reconstruction for an **M60VK2A board with 172 chips**. Select it explicitly:
+
+```yaml
+type: custom:ha-whatsminer-heatmap-card
+title: M60VK2A chip temperatures
+auto_discover: true
+layout: m60vk2a
+min_temperature: 60
+max_temperature: 100
+```
+
+A ready-to-copy configuration is also available in [examples/m60vk2a-heatmap.yaml](examples/m60vk2a-heatmap.yaml). The preset supplies its own 22-column arrangement; `columns` is not needed for it. It creates no additional entities and uses the existing web board maps.
+
+The orientation follows the supplied board photographs: **power contacts on the left, signal connector on the right**. There are eight chip rows, with an upper block of 84 positions and a lower block of 88 positions, separated by a central gap. Visible PCB labels support the alternating direction of the four-chip columns. Partly covered positions and endpoints are reconstructed from that pattern; horizontal alignment and spacing are schematic rather than a measurement of the PCB.
+
+**The mapping from WEB IDs `C0…C171` to PCB labels `U1…U172` is unverified.** The preset currently assumes `Cn → U(n+1)`. It keeps a visible warning, and any PCB labels it shows are assumed labels. The temperature and other telemetry still come from the source `C…` records; the assumption affects their placement. Verify this correspondence before using a cell to locate a physical chip.
+
+This is not a manufacturer schematic or an automatically detected board profile. No supplied photographs or board serial numbers are distributed with the preset. Selecting `layout: m60vk2a` applies it to all board maps in that card. If automatic discovery would include miners with different board models, use explicit entity selection instead.
+
+An unknown `layout` value is rejected. Do not combine the named `layout` option with the manual `layouts` option below.
+
+### Manual layout
 
 After checking the labels against a photo or documentation for the actual hashboard, provide a layout indexed by slot. This is a syntax example, not a model-specific board diagram:
 
@@ -69,6 +112,8 @@ Use the actual IDs returned by your source. LuCI logs commonly use `C0` and subs
 
 `null` entries leave empty physical positions. Chips omitted from a configured layout remain visible in a separate section. A layout position whose chip is absent from the response shows a missing reading. If all source chips include explicit `row` and `column` fields, the card can use them, while still asking you to verify the mapping against the board.
 
+Manual `layouts` continue to use the supplied source IDs without applying the preset's assumed PCB numbering. Each slot can have its own matrix. When several miners share the same slot numbers, restrict the card to the intended entities so a slot's matrix is not applied to unrelated boards.
+
 `examples/heatmap-demo.html` demonstrates one logical board with 172 chips and synthetic data, without miner requests. Serve the project with `python -m http.server 8000` to open it locally.
 
 ## Troubleshooting
@@ -78,3 +123,6 @@ Use the actual IDs returned by your source. LuCI logs commonly use `C0` and subs
 - **No web chip maps found**: no suitable source is visible yet. Enable web chip data and the board map sensors, then check Web chip data status.
 - **No fresh chip data**: check that the selected entity is a Board N web chip map sensor, is enabled and available, and exposes a non-empty `chips` attribute. Check Web chip data status for a source/login/certificate failure.
 - **No separate voltage/error entities**: optional chip metrics are attributes of each chip, not additional sensor entities. Select or hover a chip to inspect them. The map color scale remains temperature-only.
+- **Unknown layout**: use the supported `layout: m60vk2a` value with card version 0.5.3 or later, then reload the browser after updating. Remove `layout` to return to the logical grid, or use a manual `layouts` matrix instead.
+- **Both layout options specified**: keep either the named `layout` preset or manual `layouts`, not both.
+- **M60VK2A mapping warning**: this is intentional. The preset's `Cn → U(n+1)` correspondence has not been verified; selecting the preset does not establish that correspondence or turn it into a manufacturer drawing.

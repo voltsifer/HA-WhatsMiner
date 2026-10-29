@@ -1,4 +1,4 @@
-/* HA-WhatsMiner 0.5.2 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.5.3 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);
@@ -58,6 +58,42 @@ export function layoutCells(chips, explicitLayout, columns) {
     remaining: [], kind: "Logical grid · physical layout not specified", columns };
 }
 
+export function m60vk2aLayout() {
+  // Reconstructed from PCB U labels in supplied photos, not from another project's code.
+  // WEB Cn -> PCB U(n+1), far endpoints and horizontal block alignment are unverified.
+  const upper = Array.from({ length: 4 }, (_, row) => [
+    ...Array.from({ length: 21 }, (_, column) => {
+      const pcb = 89 + 4 * column + (column % 2 === 0 ? 3 - row : row);
+      return `C${pcb - 1}`;
+    }), null,
+  ]);
+  const lower = Array.from({ length: 4 }, (_, row) =>
+    Array.from({ length: 22 }, (_, column) => {
+      const domain = 21 - column;
+      const pcb = 1 + 4 * domain + (domain % 2 === 0 ? row : 3 - row);
+      return `C${pcb - 1}`;
+    }));
+  return [...upper, Array(22).fill(null), ...lower];
+}
+
+const m60vk2aRows = m60vk2aLayout();
+const m60vk2aIds = new Set(m60vk2aRows.flat().filter(id => id !== null));
+
+export function boardPlacement(chips, config, slot) {
+  if (config.layout !== "m60vk2a") return layoutCells(chips, config.layouts?.[String(slot)], config.columns);
+  const ids = chips.map(chip => String(chip.id));
+  if (chips.length > 172 || new Set(ids).size !== ids.length || ids.some(id => !m60vk2aIds.has(id))) {
+    throw new Error("M60VK2A requires WEB chip IDs C0 through C171. Check the board and selected layout profile.");
+  }
+  const placement = layoutCells(chips, m60vk2aRows, 22);
+  return { ...placement,
+    cells: placement.cells.map(chip => ({ ...chip, pcbLabel: `U${Number(chip.id.slice(1)) + 1}` })),
+    kind: "M60VK2A · reconstructed layout · unverified mapping",
+    profile: "m60vk2a", spacerRows: [4],
+    warning: "Unverified mapping: C0 → U1, C1 → U2, through C171 → U172. Some PCB positions are inferred from the photographed numbering pattern.",
+  };
+}
+
 const css = `
 :host{display:block}*{box-sizing:border-box}ha-card{display:block;padding:20px;color:var(--primary-text-color,#e9eff7);background:var(--ha-card-background,var(--card-background-color,#151e2b));border-radius:var(--ha-card-border-radius,16px);border:1px solid var(--divider-color,#344154);font-family:var(--paper-font-body1_-_font-family,system-ui,sans-serif)}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.title{font-size:20px;font-weight:650}.subtitle{font-size:12px;color:var(--secondary-text-color,#a5b4c8);margin-top:6px}.modes{display:flex;gap:5px}.mode{border:1px solid var(--divider-color,#40516a);border-radius:8px;padding:7px 10px;background:transparent;color:inherit;cursor:pointer;font-size:12px}.mode.active{background:#246475;color:white;border-color:#51c6c9}.board{margin-top:22px}.boardhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}.boardname{font-weight:650}.stats{font-size:12px;color:var(--secondary-text-color,#a5b4c8)}.placement{font-size:11px;margin:7px 0 10px;color:var(--secondary-text-color,#a5b4c8)}.scroll{overflow-x:auto;padding-bottom:5px}.grid{display:grid;gap:5px;min-width:min-content}.chip{border:1px solid #ffffff24;color:#fff;text-shadow:0 1px 2px #0008;min-width:46px;min-height:51px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;font:inherit;cursor:pointer;padding:6px 3px}.chip:hover,.chip:focus-visible{outline:2px solid var(--primary-text-color,#fff);outline-offset:1px}.chipid{font-size:10px;opacity:.88}.temp{font-size:12px;font-weight:700}.missing{background:repeating-linear-gradient(45deg,#536071,#536071 4px,#424e60 4px,#424e60 8px)!important}.legend{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--secondary-text-color,#a5b4c8);margin-top:20px;flex-wrap:wrap}.bar{width:140px;height:7px;border-radius:5px;background:linear-gradient(90deg,hsl(210 72% 44%),hsl(150 72% 44%),hsl(70 72% 44%),hsl(0 72% 44%))}.bar.delta{background:linear-gradient(90deg,hsl(215 65% 44%),hsl(150 68% 42%),hsl(0 68% 42%))}.message{padding:16px 0;color:var(--secondary-text-color,#a5b4c8)}.details{padding:10px;margin-top:12px;border-radius:8px;background:#8097b018;font-size:13px;min-height:36px}.note{margin-top:9px;color:var(--secondary-text-color,#a5b4c8);font-size:11px;line-height:1.5}.demo{padding:7px 10px;background:#8b5c15;color:white;border-radius:7px;font-size:11px;margin-bottom:14px}
@@ -69,6 +105,8 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     return { auto_discover: true, columns: 14, min_temperature: 60, max_temperature: 100 };
   }
   setConfig(config) {
+    if (config.layout !== undefined && config.layout !== "m60vk2a") throw new Error("Unknown layout profile. Use m60vk2a, or omit layout for automatic placement.");
+    if (config.layout && config.layouts) throw new Error("Use either layout or layouts, not both.");
     const entities = config.entities || (config.entity ? [config.entity] : []);
     const autoDiscover = config.auto_discover ?? (!config.entities && !config.entity);
     if (typeof autoDiscover !== "boolean") throw new Error("auto_discover must be true or false");
@@ -76,7 +114,7 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     if (autoDiscover && entities.length) throw new Error("Remove entity/entities when using auto_discover: true");
     const min = config.min_temperature ?? 70, max = config.max_temperature ?? 110;
     if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error("Check the color scale limits");
-    const columns = config.columns ?? 10;
+    const columns = config.columns ?? (config.layout === "m60vk2a" ? 22 : 10);
     if (!Number.isInteger(columns) || columns < 1 || columns > 128) throw new Error("columns must be between 1 and 128");
     if (config.layouts) {
       if (typeof config.layouts !== "object" || Array.isArray(config.layouts)) throw new Error("layouts must be an object indexed by slot number");
@@ -159,10 +197,14 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
         board.append(this._node("div", "note", "Voltage and frequency retain raw firmware values; their units/scales are unverified. Counters are snapshots; pct/x meanings are firmware-specific."));
       }
       let placement;
-      try { placement = layoutCells(chips, cfg.layouts?.[String(slot)], cfg.columns); }
+      try { placement = boardPlacement(chips, cfg, slot); }
       catch (error) { board.append(this._node("div", "message", error.message)); continue; }
       board.append(this._node("div", "placement", placement.kind));
-      const grid = this._grid(placement.cells, placement.columns, reference, slot, details);
+      if (placement.warning) {
+        board.append(this._node("div", "note", placement.warning));
+        board.append(this._node("div", "placement", "Power terminals: left · Signal connector: right · Block alignment and spacing are schematic. PCB labels marked * are assumed."));
+      }
+      const grid = this._grid(placement.cells, placement.columns, reference, slot, details, placement.spacerRows);
       board.append(grid);
       if (placement.remaining.length) {
         board.append(this._node("div", "placement", "Chips outside the specified layout — check their placement"));
@@ -178,11 +220,16 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
     const left = this._mode === "absolute" ? `${cfg.min_temperature}°C` : "−15°C";
     const right = this._mode === "absolute" ? `${cfg.max_temperature}°C` : "+15°C";
     legend.append(this._node("span", "", left), this._node("div", `bar ${this._mode === "delta" ? "delta" : ""}`), this._node("span", "", right), this._node("span", "", "▨ No reading"));
-    card.append(legend, details, this._node("div", "note", "The color scale compares readings; it is not a temperature limit. Logical grid adjacency does not represent the physical board geometry."));
+    card.append(legend, details, this._node("div", "note", "The color scale compares readings; it is not a temperature limit. Check the placement label before interpreting neighboring cells as physical neighbors."));
   }
-  _grid(cells, columns, reference, slot, details) {
+  _grid(cells, columns, reference, slot, details, spacerRows = []) {
     const scroll = this._node("div", "scroll"), grid = this._node("div", "grid");
     grid.style.gridTemplateColumns = `repeat(${columns}, minmax(46px, 1fr))`;
+    if (spacerRows.length) {
+      const rows = Math.max(...cells.map(chip => chip.row)) + 1;
+      grid.style.gridTemplateRows = Array.from({ length: rows }, (_, row) =>
+        spacerRows.includes(row) ? "24px" : "minmax(51px, auto)").join(" ");
+    }
     scroll.append(grid);
     for (const chip of cells) {
       const value = finiteTemperature(chip.temperature);
@@ -192,9 +239,10 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       cell.style.gridRow = String(chip.row + 1); cell.style.gridColumn = String(chip.column + 1);
       cell.style.background = chipColor(value, this._config.min_temperature, this._config.max_temperature, this._mode, reference);
       cell.append(this._node("span", "chipid", chip.id), this._node("span", "temp", tempText));
+      if (chip.pcbLabel) cell.append(this._node("span", "chipid pcbid", `${chip.pcbLabel}*`));
       const delta = value === null || reference === null ? "—" : `${value - reference >= 0 ? "+" : ""}${(value - reference).toFixed(1)}°C`;
       const telemetry = chipDetails(chip);
-      cell.title = `Slot ${slot} · ${chip.id} · ${tempText} · Δ ${delta}${telemetry ? ` · ${telemetry}` : ""}`;
+      cell.title = `Slot ${slot} · ${chip.id}${chip.pcbLabel ? ` · assumed PCB ${chip.pcbLabel}` : ""} · ${tempText} · Δ ${delta}${telemetry ? ` · ${telemetry}` : ""}`;
       cell.setAttribute("aria-label", cell.title);
       cell.onclick = () => { details.textContent = cell.title; };
       grid.append(cell);

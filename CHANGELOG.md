@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3
+
+- Add the opt-in `layout: m60vk2a` HeatMap profile reconstructed from supplied PCB photographs: upper 4-by-21 and lower 4-by-22 sections with a central gap.
+- Preserve WEB chip identities and telemetry; show assumed PCB references separately with a visible unverified C-to-U mapping notice and schematic orientation. Reject incompatible chip identities instead of silently assigning positions.
+- Keep the default logical grid and manual layouts available, and preserve the permanent JavaScript URL. The profile adds no entities or device requests.
+- Document InfluxDB chip-data exclusions separately from Recorder history.
+- Pass 77 automated tests (56 Python, 21 JavaScript).
+
 ## 0.5.2
 
 - Discover web board maps automatically without manual entity IDs, including renamed entities and dynamically appearing boards.
