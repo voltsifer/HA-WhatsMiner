@@ -30,7 +30,7 @@ function frame(payload, id = entity(payload.slot), stamp = measured + 1000) {
 }
 function option(frames, overrides = {}) {
   const variables = {metric: 'temperature', lookback: '2h', __to: String(moment), 'boards:json': '[]', ...overrides};
-  return chartFunction({panel: {data: {series: frames}}, grafana: {
+  return chartFunction({echarts, panel: {data: {series: frames}}, grafana: {
     theme: {isDark: true}, replaceVariables: text => variables[text.slice(2, -1)] ?? text,
   }});
 }
@@ -59,6 +59,7 @@ test('Grafana renders 516 cells with ECharts and preserves source IDs and full t
     assert.match(svg, /Unverified/);
     assert.ok(!svg.includes('NaN'));
     assert.equal(chart.getZr().storage.getDisplayList().filter(item => item.style?.text?.endsWith('°')).length, 516);
+    assert.ok(chart.getZr().storage.getDisplayList().some(item => item.style?.text?.endsWith('°') && item.style.fill === '#000000'));
     // The same option must adapt when Grafana only calls chart.resize().
     const firstRect = chart.getZr().storage.getDisplayList().find(item => item.type === 'rect' && item.shape.height > 8);
     const originalWidth = firstRect.shape.width;
@@ -90,6 +91,30 @@ test('Grafana keeps all 172 PCB positions and the photographed numbering anchors
       assert.equal(cell.row, rowIndex > 4 ? rowIndex - 0.5 : rowIndex);
     }
   }));
+});
+
+test('Short editor panels and narrow panels keep all 516 measurements visible after resizing', () => {
+  const opt = option([0, 1, 2].map(slot => frame(snapshot(slot))));
+  const chart = echarts.init(null, null, {renderer: 'svg', ssr: true, width: 2048, height: 400});
+  try {
+    chart.setOption(opt);
+    for (const [width, height] of [[2048, 400], [1600, 720], [660, 400], [1600, 1000], [2048, 400]]) {
+      chart.resize({width, height});
+      const svg = chart.renderToSVGString();
+      const values = chart.getZr().storage.getDisplayList().filter(item => item.style?.text?.endsWith('°'));
+      assert.equal(values.length, 516, `${width}x${height}`);
+      assert.ok(!svg.includes('NaN'));
+      if (width === 1600 && height === 720) {
+        assert.ok(values.every(item => Number(/([\d.]+)px/.exec(item.style.font)?.[1]) >= 10));
+      }
+      if (width === 2048) {
+        const labels = chart.getZr().storage.getDisplayList().filter(item => /^U\d+$/.test(item.style?.text || ''));
+        assert.equal(labels.length, 516);
+      }
+    }
+    const first = opt.series[0].data[0];
+    assert.match(opt.series[0].tooltip.formatter({dataIndex: 0}), new RegExp(`assumed PCB ${first.label} · WEB ${first.id}`));
+  } finally { chart.dispose(); }
 });
 
 test('Missing and invalid metrics remain missing, while zero values and other metrics survive', () => {
@@ -194,6 +219,7 @@ test('Importable dashboard embeds its readable sources and bounds historical Flu
   const panel = dashboard.panels.find(panel => panel.type === 'volkovlabs-echarts-panel');
   assert.equal(panel.options.getOption, source);
   assert.equal(panel.options.editorMode, 'code');
+  assert.equal(panel.options.renderer, 'svg');
   assert.equal(panel.options.map, 'none');
   assert.equal(panel.targets[0].query, flux);
   assert.match(flux, /range\(start: snapshotStart, stop: v\.timeRangeStop\)/);

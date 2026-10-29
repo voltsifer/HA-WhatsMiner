@@ -1,5 +1,12 @@
 # Changelog
 
+## Grafana dashboard revision 2
+
+- Keep measurements visible in short panel previews and after resizing: use larger inline U/value text when there is room, stacked text in tall cells, and value-first labels in narrow cells. Preserve full chip identity and telemetry in the tooltip.
+- Use vector SVG rendering, contrasting black/white text and portable hexadecimal fill colors; reserve clearer space below board headers. Add a real ECharts regression for 400-pixel-high previews, narrow panels and repeated resizing with all 516 values present.
+- Update only the generated Grafana dashboard and its readable sources. The integration remains at 0.5.5; existing panels can replace their chart function and select SVG without an HA restart.
+- Pass 92 automated tests in total (60 existing Python tests, 32 JavaScript tests).
+
 ## 0.5.5
 
 - Add a ready-to-import Grafana M60VK2A dashboard with source-preserving U labels, a selector for all normalized chip metrics, per-board read times and historical selection at the time range endpoint. Use the signed Business Charts plugin and existing InfluxDB 2.x / Flux data source.

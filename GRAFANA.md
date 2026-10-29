@@ -109,6 +109,12 @@ The chart displays snapshot times in **UTC**, explicitly marked in its labels. T
 
 The metric selector includes temperature, raw frequency and voltage, nonce/errors/CRC/repeat counters, both x values and both pct values. Voltage/frequency scales and x/pct meanings remain unverified. Counter values are snapshots, not calculated rates. Missing selected metrics are shown as missing readings rather than zero.
 
+### Update an already imported dashboard
+
+Grafana dashboard revision 2 fixes hidden measurements in short editor panels and uses SVG rendering with larger, width-aware text and black/white foregrounds selected for background contrast. Low, wide cells show the U label beside the selected value; tall cells can show two lines. Very narrow cells prioritize the measurement, with the complete identity retained in the tooltip. Expanding the panel or leaving the editor provides more readable space.
+
+For an existing customized dashboard, edit its Business Charts panel, replace **Code / Function** with the current [grafana/heatmap.js](grafana/heatmap.js) contents, set **Renderer** to **SVG**, apply the panel change and save the dashboard. Keep its existing query and dashboard variables. Alternatively, import the updated JSON over the existing dashboard UID, then reselect your data source, bucket and boards if the import resets those choices. This display-only revision does not require an HA-WhatsMiner integration upgrade or Home Assistant restart.
+
 ## 4. Choose a historical moment
 
 Use Grafana's time picker and set the **To** value to the date and time to inspect. The map represents that endpoint, not an average over the dashboard's entire From–To range. Each board query returns its latest archived snapshot within the selected lookback ending at **To**. The bounded query avoids loading an entire year of snapshots just to draw one map.

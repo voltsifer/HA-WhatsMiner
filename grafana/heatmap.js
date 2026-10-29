@@ -1,4 +1,4 @@
-// HA-WhatsMiner 0.5.5 · Business Charts function (not a browser module).
+// HA-WhatsMiner 0.5.5 · Grafana dashboard revision 2 (not a browser module).
 // This body is embedded verbatim in the generated Grafana dashboard.
 const metrics = {
   temperature: "Temperature (°C)", voltage_raw: "Voltage (raw)",
@@ -94,9 +94,25 @@ const observed = boards.flatMap(board => [...board.chips.values()].map(chip => f
 let min = metric === "temperature" ? 60 : observed.length ? Math.min(...observed) : 0;
 let max = metric === "temperature" ? 100 : observed.length ? Math.max(...observed) : 1;
 if (min === max) max = min + Math.max(1, Math.abs(min) * 0.05);
-const color = value => value === null ? missingColor : `hsl(${210 * (1 - Math.max(0, Math.min(1, (value - min) / (max - min))))},72%,44%)`;
+const color = value => {
+  if (value === null) return missingColor;
+  const hue = 210 * (1 - Math.max(0, Math.min(1, (value - min) / (max - min)))) / 60;
+  const chroma = 0.6336, offset = 0.1232;
+  const secondary = chroma * (1 - Math.abs(hue % 2 - 1));
+  const rgb = hue < 1 ? [chroma, secondary, 0] : hue < 2 ? [secondary, chroma, 0]
+    : hue < 3 ? [0, chroma, secondary] : [0, secondary, chroma];
+  return `#${rgb.map(channel => Math.round((channel + offset) * 255).toString(16).padStart(2, "0")).join("")}`;
+};
+const foreground = background => {
+  const channels = [1, 3, 5].map(start => parseInt(background.slice(start, start + 2), 16) / 255)
+    .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722 > 0.179 ? "#000000" : "#ffffff";
+};
 const number = value => value === null ? "—" : Number.isInteger(value) ? String(value) : value.toFixed(metric === "temperature" ? 1 : 2);
 const suffix = metric === "temperature" ? "°" : "";
+const textWidth = (text, font) => context.echarts?.format?.getTextRect
+  ? context.echarts.format.getTextRect(text, font).width
+  : text.length * Number(/\d+/.exec(font)?.[0] || 10) * 0.65;
 const grid = [], xAxis = [], yAxis = [], series = [], title = [];
 const boardShare = 90 / boards.length;
 boards.forEach((board, boardIndex) => {
@@ -111,8 +127,8 @@ boards.forEach((board, boardIndex) => {
   title.push({ text: board.slot === undefined ? board.id : `Board ${board.slot} · ${board.id}`,
     subtext: `${board.status} · ${stats}`, left: 8, top: `${top - 2}%`,
     textStyle: { color: textColor, fontSize: 11, fontWeight: 600 },
-    subtextStyle: { color: mutedColor, fontSize: 10, lineHeight: 12 }, itemGap: 2 });
-  grid.push({ left: 8, right: 8, top: `${top + 2.5}%`, height: `${boardShare - 5.5}%`, containLabel: false });
+    subtextStyle: { color: mutedColor, fontSize: 10, lineHeight: 12 }, itemGap: 2, padding: 0 });
+  grid.push({ left: 8, right: 8, top: `${top + 4.5}%`, height: `${boardShare - 7.5}%`, containLabel: false });
   xAxis.push({ type: "value", min: -0.5, max: 21.5, gridIndex: boardIndex, show: false });
   yAxis.push({ type: "value", min: -0.5, max: 8, inverse: true, gridIndex: boardIndex, show: false });
   series.push({ name: board.id, type: "custom", coordinateSystem: "cartesian2d", xAxisIndex: boardIndex,
@@ -123,18 +139,40 @@ boards.forEach((board, boardIndex) => {
       const [x, y] = api.coord([cell.column, cell.row]);
       const size = api.size([1, 1]);
       const width = Math.max(1, Math.abs(size[0]) - 2), height = Math.max(1, Math.abs(size[1]) - 2);
-      const small = height < 27;
-      const fitsValue = width >= 22 && height >= 16;
-      const font = height < 20 ? 8 : small ? 10 : 12;
-      const labelFont = height < 20 ? 7 : small ? 8 : 10;
+      const background = color(cell.reading), cellText = foreground(background);
+      const stacked = width >= 36 && height >= 32;
+      const font = 16;
+      const labelFont = 11;
+      const valueText = `${number(cell.reading)}${suffix}`;
+      let inlineFont = Math.max(5, Math.min(15, Math.floor(height - 1)));
+      let inlineLabelFont = Math.max(5, Math.min(11, inlineFont - 2));
+      const combinedWidth = () => textWidth(cell.label, `${inlineLabelFont}px sans-serif`)
+        + 6 + textWidth(valueText, `bold ${inlineFont}px sans-serif`);
+      while (combinedWidth() > width - 4 && inlineFont > 9) {
+        inlineFont--;
+        inlineLabelFont = Math.max(5, Math.min(11, inlineFont - 2));
+      }
+      // A short panel still needs its measurements. Use one line when wide,
+      // otherwise prioritize the value; full chip identity remains in the tooltip.
+      const combinedFits = combinedWidth() <= width - 4;
+      const inlineText = combinedFits ? `{id|${cell.label}}  {reading|${valueText}}` : valueText;
+      const textNodes = stacked ? [
+        { type: "text", style: { x, y: y - font * 0.5, text: cell.label, fill: cellText,
+          font: `${labelFont}px sans-serif`, align: "center", verticalAlign: "middle" } },
+        { type: "text", style: { x, y: y + labelFont * 0.5, text: valueText,
+          fill: cellText, font: `bold ${font}px sans-serif`, align: "center", verticalAlign: "middle",
+          width: Math.max(1, width - 2), overflow: "truncate" } },
+      ] : [{ type: "text", style: { x, y, text: inlineText, fill: cellText,
+        font: `bold ${inlineFont}px sans-serif`, align: "center", verticalAlign: "middle",
+        rich: combinedFits ? {
+          id: { fontSize: inlineLabelFont, fontFamily: "sans-serif", fontWeight: "normal", fill: cellText },
+          reading: { fontSize: inlineFont, fontFamily: "sans-serif", fontWeight: "bold", fill: cellText },
+        } : undefined,
+        width: Math.max(1, width - 2), overflow: "truncate" } }];
       return { type: "group", children: [
         { type: "rect", shape: { x: x - width / 2, y: y - height / 2, width, height, r: 2 },
-          style: { fill: color(cell.reading), stroke: "#ffffff24", lineWidth: 0.5 } },
-        { type: "text", style: { x, y: fitsValue ? y - font * 0.5 : y, text: cell.label, fill: "#ffffff",
-          font: `${labelFont}px sans-serif`, align: "center", verticalAlign: "middle" } },
-        ...(fitsValue ? [{ type: "text", style: { x, y: y + font * 0.5, text: `${number(cell.reading)}${suffix}`,
-          fill: "#ffffff", font: `bold ${font}px sans-serif`, align: "center", verticalAlign: "middle",
-          width: Math.max(1, width - 2), overflow: "truncate" } }] : []),
+          style: { fill: background, stroke: "#ffffff24", lineWidth: 0.5 } },
+        ...textNodes,
       ] };
     },
     tooltip: { formatter(params) {
