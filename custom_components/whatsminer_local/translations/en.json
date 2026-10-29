@@ -1,0 +1,103 @@
+{
+  "title": "HA-WhatsMiner",
+  "config": {
+    "step": {
+      "user": {
+        "title": "WhatsMiner API 3.x",
+        "description": "Direct local connection. Setup reads telemetry only. API 2.x on port 4028 is not supported.",
+        "data": {
+          "host": "Host",
+          "port": "TCP port",
+          "scan_interval": "Polling interval (seconds)",
+          "enable_control": "Enable power control",
+          "web_chips": "Read individual chips from WEB (experimental)"
+        }
+      },
+      "control": {
+        "title": "Power control",
+        "description": "Enter limits appropriate for your exact model. Enable API Write in WhatsminerTool. Use super or user1–user3. Setup does not test credentials with a write command.",
+        "data": {
+          "account": "API account",
+          "password": "API password",
+          "min_power": "Minimum permitted power (W)",
+          "max_power": "Maximum permitted power (W)",
+          "min_power_percent": "Minimum permitted power percentage",
+          "power_percent_mode": "Default power percentage adjustment mode"
+        }
+      },
+      "web": {
+        "title": "Individual chip WEB data",
+        "description": "Experimental JSON adapter. Enter an observed GET endpoint and the contract in WEB_CHIPS.md. Your firmware endpoint/schema is not yet verified. No automatic HTML parsing or LuCI login. WEB credentials are separate; blank secret fields preserve existing values.",
+        "data": {
+          "web_protocol": "WEB protocol",
+          "web_port": "WEB port",
+          "web_path": "Observed GET path starting with /",
+          "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
+          "web_auth": "WEB authentication",
+          "web_username": "WEB username",
+          "web_password": "WEB password",
+          "web_cookie": "WEB session cookie"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot read API 3.x. Check host, port 4433, firmware and connectivity.",
+      "password_required": "Enter the API password.",
+      "invalid_limits": "Minimum must be below maximum.",
+      "different_device": "Different miner at this address. Add it as a separate device.",
+      "invalid_web_endpoint": "Enter a relative path /… and a JSON Pointer /… or blank.",
+      "web_credentials_required": "Provide credentials for the selected WEB authentication method."
+    },
+    "abort": {
+      "already_configured": "This miner is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Connection settings",
+        "data": {
+          "host": "Host",
+          "port": "TCP port",
+          "scan_interval": "Polling interval (seconds)",
+          "enable_control": "Enable power control",
+          "web_chips": "Read individual chips from WEB (experimental)"
+        }
+      },
+      "control": {
+        "title": "Power control",
+        "description": "Leave password blank to keep the existing password. Changing bounds does not change the miner's power setting.",
+        "data": {
+          "account": "API account",
+          "password": "New API password",
+          "min_power": "Minimum permitted power (W)",
+          "max_power": "Maximum permitted power (W)",
+          "min_power_percent": "Minimum permitted power percentage",
+          "power_percent_mode": "Default power percentage adjustment mode"
+        }
+      },
+      "web": {
+        "title": "Individual chip WEB data",
+        "description": "Experimental JSON adapter. Enter an observed GET endpoint and the contract in WEB_CHIPS.md. Your firmware endpoint/schema is not yet verified. No automatic HTML parsing or LuCI login. WEB credentials are separate; blank secret fields preserve existing values.",
+        "data": {
+          "web_protocol": "WEB protocol",
+          "web_port": "WEB port",
+          "web_path": "Observed GET path starting with /",
+          "web_json_pointer": "JSON Pointer to the boards container (blank = root)",
+          "web_auth": "WEB authentication",
+          "web_username": "WEB username",
+          "web_password": "WEB password",
+          "web_cookie": "WEB session cookie"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot read API 3.x.",
+      "password_required": "Enter the API password.",
+      "invalid_limits": "Minimum must be below maximum.",
+      "different_device": "Different miner at this address. Add it separately.",
+      "invalid_web_endpoint": "Enter a relative path /… and a JSON Pointer /… or blank.",
+      "web_credentials_required": "Provide credentials for the selected WEB authentication method."
+    }
+  }
+}

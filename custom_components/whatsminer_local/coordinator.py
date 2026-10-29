@@ -1,0 +1,66 @@
+"""One shared polling coordinator per miner."""
+import asyncio
+from datetime import timedelta
+import logging
+
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
+
+from .api import WhatsminerClient, WhatsminerError, flatten
+from .chip_web import ChipWebClient, ChipWebError
+from .const import (
+    CONF_PERCENT_MODE, CONF_WEB_AUTH, CONF_WEB_CHIPS, CONF_WEB_COOKIE, CONF_WEB_PASSWORD,
+    CONF_WEB_PATH, CONF_WEB_POINTER, CONF_WEB_PORT, CONF_WEB_PROTOCOL, CONF_WEB_USERNAME,
+    DEFAULT_INTERVAL, DEFAULT_PORT, DOMAIN,
+)
+
+LOGGER = logging.getLogger(__name__)
+
+
+class WhatsminerCoordinator(DataUpdateCoordinator):
+    def __init__(self, hass, entry):
+        self.entry = entry
+        self.config = {**entry.data, **entry.options}
+        self.client = WhatsminerClient(self.config[CONF_HOST], self.config.get(CONF_PORT, DEFAULT_PORT))
+        self.snapshot = {}
+        self.command_lock = asyncio.Lock()
+        self.percent_mode = self.config.get(CONF_PERCENT_MODE, "normal")
+        self.chip_boards = []
+        self.chip_updated_at = None
+        self.web_client = None
+        if self.config.get(CONF_WEB_CHIPS):
+            self.web_client = ChipWebClient(
+                async_get_clientsession(hass), self.config[CONF_HOST],
+                self.config.get(CONF_WEB_PROTOCOL, "http"), self.config.get(CONF_WEB_PORT, 80),
+                self.config[CONF_WEB_PATH], self.config.get(CONF_WEB_POINTER, ""),
+                self.config.get(CONF_WEB_AUTH, "none"), self.config.get(CONF_WEB_USERNAME, ""),
+                self.config.get(CONF_WEB_PASSWORD, ""), self.config.get(CONF_WEB_COOKIE, ""))
+        super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(
+            seconds=self.config.get(CONF_SCAN_INTERVAL, DEFAULT_INTERVAL)))
+
+    async def _async_update_data(self):
+        try:
+            snapshot = await self.client.read_snapshot()
+            values = flatten(snapshot)
+        except (WhatsminerError, TypeError, KeyError, AttributeError, ValueError) as err:
+            raise UpdateFailed("Could not read WhatsMiner API 3.x telemetry") from err
+        self.snapshot = snapshot
+        if self.web_client is not None:
+            # WEB failures invalidate only the chip readings, not API telemetry.
+            self.chip_boards = []
+            self.chip_updated_at = None
+            try:
+                self.chip_boards = await self.web_client.read_chips()
+            except ChipWebError as err:
+                values["chip-web-status"] = str(err)
+            else:
+                self.chip_updated_at = dt_util.utcnow().isoformat()
+                values["chip-web-status"] = "ok"
+                for board in self.chip_boards:
+                    temperatures = [c["temperature"] for c in board["chips"] if c["temperature"] is not None]
+                    values[f"web-board-{board['slot']}-chip-max"] = max(temperatures) if temperatures else None
+                    for chip in board["chips"]:
+                        values[f"web-chip-{board['slot']}-{chip['id']}"] = chip["temperature"]
+        return values

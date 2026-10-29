@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HA-WhatsMiner · демонстрация HeatMap</title>
+<style>body{margin:0;background:#0b111d;color:#e9eff7;font:14px system-ui,sans-serif}main{max-width:940px;margin:36px auto;padding:0 24px}.eyebrow{color:#64d1cc;font-size:12px;letter-spacing:.16em;font-weight:700}h1{font-size:32px;letter-spacing:-.03em;margin:10px 0}p{color:#a5b4c8;line-height:1.5;margin-bottom:25px}.footer{font-size:12px;margin:18px 0 40px}ha-whatsminer-heatmap-card{--primary-text-color:#e9eff7;--secondary-text-color:#a5b4c8;--ha-card-background:#151e2b;--divider-color:#344154}</style>
+<main><div class="eyebrow">HA-WHATSMINER / HOME ASSISTANT</div><h1>Температуры чипов на одной карте</h1><p>Пример карточки для HAOS. Все числа вымышлены; показана одна плата со 172 чипами. Нумерация и сетка не описывают конкретную модель майнера.</p><ha-whatsminer-heatmap-card></ha-whatsminer-heatmap-card><p class="footer">Нажмите чип для деталей. Переключите Δ, чтобы сравнить температуру с медианой его платы.</p></main>
+<script type="module">
+import '../custom_components/whatsminer_local/www/ha-whatsminer-heatmap-card.js';
+const card = document.querySelector('ha-whatsminer-heatmap-card');
+const states = {}, entities = [];
+for (let slot=0; slot<1; slot++) {
+ const chips = Array.from({length:172}, (_,i)=>({id:`U${i+1}`,temperature:Number((83 + slot*2 + Math.floor(i/14)*1.5 + Math.sin(i*1.3)*2).toFixed(1))}));
+ chips[91].temperature=108.8;chips[92].temperature=101.4;
+ chips[13].temperature=null;
+ const id=`sensor.demo_chip_map_slot_${slot}`; entities.push(id);
+ states[id]={entity_id:id,state:String(Math.max(...chips.map(c=>c.temperature??-Infinity))),attributes:{slot,chips,source:'web',updated_at:new Date().toISOString()}};
+}
+card.setConfig({entities,columns:14,demo:true,min_temperature:75,max_temperature:110});
+card.hass={states};
+window.demoCard=card;
+</script></html>
