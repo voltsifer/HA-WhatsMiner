@@ -123,13 +123,48 @@ class TestLuCIParsing(unittest.TestCase):
         boards = parse_web_response(body)
         self.assertEqual([b['slot'] for b in boards], [0, 2])
         self.assertEqual([len(b['chips']) for b in boards], [172, 172])
-        self.assertEqual(boards[0]['chips'][0], {'id': 'C0', 'temperature': 80})
+        self.assertEqual(boards[0]['chips'][0]['temperature'], 80)
+        self.assertEqual(boards[0]['chips'][0]['frequency_raw'], 700)
+        self.assertEqual(boards[0]['chips'][0]['voltage_raw'], 1200)
         self.assertEqual(boards[0]['chips'][-1]['id'], 'C171')
         self.assertLess(boards[0]['chips'][-1]['temperature'], 200)
 
     def test_plain_log_and_missing_reading(self):
         boards = parse_web_response(b'slot: 0, temp: 70\nC0 freq: 700 temp: 0\nC1 freq:700 temp:N/A\nC2 freq:700\n')
         self.assertEqual([c['temperature'] for c in boards[0]['chips']], [0, None, None])
+
+    def test_all_chip_fields_pairs_and_whitespace(self):
+        boards = parse_web_response(b'slot: 2\nC0 freq:480 vol:275 temp:73 nonce:1234 err:3 crc:0 x:0 / 2 repeat:0 pct: 99.3%/ 96.6%\nC1 freq:0 vol:N/A temp:N/A nonce:0 err:0 crc:0 x:1/0 repeat:2 pct:100.4%/101.0%')
+        self.assertEqual(boards[0]['chips'][0], {
+            'id': 'C0', 'temperature': 73, 'frequency_raw': 480, 'voltage_raw': 275,
+            'nonce': 1234, 'errors': 3, 'crc_errors': 0, 'x': 0, 'x_secondary': 2,
+            'repeat': 0, 'pct': 99.3, 'pct_secondary': 96.6,
+        })
+        second = boards[0]['chips'][1]
+        self.assertEqual(second['pct_secondary'], 101)
+        self.assertEqual(second['frequency_raw'], 0)
+        self.assertIsNone(second['voltage_raw'])
+        self.assertIsNone(second['temperature'])
+
+    def test_optional_metrics_are_validated_and_unknown_fields_dropped(self):
+        chip = normalize_chips({'boards': [{'slot': 0, 'chips': [{
+            'id': 'C0', 'temperature': None, 'voltage_raw': True, 'frequency_raw': 'inf',
+            'errors': -1, 'nonce': 1.5, 'crc_errors': 0, 'pct': '103.2',
+            'password': 'never-copy-this',
+        }]}]})[0]['chips'][0]
+        for key in ('voltage_raw', 'frequency_raw', 'errors', 'nonce'):
+            self.assertIsNone(chip[key])
+        self.assertEqual(chip['crc_errors'], 0)
+        self.assertEqual(chip['pct'], 103.2)
+        self.assertNotIn('password', chip)
+        self.assertNotIn('repeat', chip)
+
+    def test_metrics_without_temperature_and_no_cross_chip_leakage(self):
+        chips = parse_web_response(b'slot: 0\nC0 vol:274 err:3\nC1 nonce:20 crc:0')[0]['chips']
+        self.assertIsNone(chips[0]['temperature'])
+        self.assertEqual(chips[0]['voltage_raw'], 274)
+        self.assertNotIn('voltage_raw', chips[1])
+        self.assertEqual(chips[1]['nonce'], 20)
 
     def test_login_page_is_not_chip_data(self):
         with self.assertRaisesRegex(ChipWebError, '^web_auth_required$'):

@@ -41,6 +41,30 @@ test('Lost readings are not kept on the map', () => {
   assert.match(card.shadowRoot.textContent, /no fresh chip data/);
 });
 
+test('Selected chip exposes all available telemetry with zero and missing values', () => {
+  const card = makeCard([{ id: 'C0', temperature: 73, frequency_raw: 480, voltage_raw: 275,
+    nonce: 1234, errors: 3, crc_errors: 0, x: 0, x_secondary: 2, repeat: null,
+    pct: 99.3, pct_secondary: 96.6, password: 'never-display-this' }]);
+  const cell = card.shadowRoot.querySelector('.chip');
+  cell.click();
+  const text = card.shadowRoot.querySelector('.details').textContent;
+  for (const expected of ['Frequency (raw): 480', 'Voltage (raw): 275', 'Nonce: 1234',
+    'Errors: 3', 'CRC errors: 0', 'x (first): 0', 'x (second): 2', 'Repeat: —',
+    'pct (first, %): 99.3', 'pct (second, %): 96.6']) assert.ok(text.includes(expected), expected);
+  assert.ok(!text.includes('never-display-this'));
+  assert.match(card.shadowRoot.textContent, /units\/scales are unverified/);
+});
+
+test('Other telemetry remains selectable when every temperature is missing', () => {
+  const card = makeCard([]);
+  card.hass = { states: { [id]: { state: 'unknown', attributes: { slot: 0,
+    chips: [{ id: 'C0', temperature: null, voltage_raw: 275, errors: 0 }] } } } };
+  const cell = card.shadowRoot.querySelector('.chip');
+  assert.ok(cell);
+  cell.click();
+  assert.match(card.shadowRoot.querySelector('.details').textContent, /Voltage \(raw\): 275.*Errors: 0/);
+});
+
 test('Chip labels and titles cannot inject HTML', () => {
   const card = makeCard([{ id: '<img src=x onerror=alert(1)>', temperature: 92 }], { title: '<script>bad()</script>' });
   assert.equal(card.shadowRoot.querySelectorAll('img,script').length, 0);

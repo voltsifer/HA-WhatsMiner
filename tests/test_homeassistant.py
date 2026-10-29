@@ -268,3 +268,56 @@ class TestHomeAssistant(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(flow['errors']['base'], 'cannot_connect')
         self.assertEqual(self.client.read_snapshot.await_count, before + 1)
         self.assertEqual(entry.data['host'], '192.0.2.10')
+
+    async def test_password_failure_hint_in_fast_mode_and_no_retry(self):
+        entry = await self.add_entry(control=True, extra={'power_percent_mode': 'fast'})
+        entity = next(s for s in self.hass.states.async_all('number') if s.attributes.get('unit_of_measurement') == '%')
+        self.client.set_power_percent.side_effect = APIError(-1, 'invalid json or password is wrong')
+        with self.assertRaisesRegex(HomeAssistantError, 'selected API account.*Configure.*Web credentials') as error:
+            await self.hass.services.async_call('number', 'set_value', {
+                'entity_id': entity.entity_id, 'value': 80}, blocking=True)
+        self.assertIn('mode fast', str(error.exception))
+        self.assertNotIn('requires completed tuning', str(error.exception))
+        self.client.set_power_percent.assert_awaited_once_with(80, 'fast', 'super', 'secret')
+        self.assertEqual(self.hass.states.get(entity.entity_id).attributes['last_command']['reason'],
+                         'invalid json or password is wrong')
+
+    async def test_chip_metrics_survive_to_maps_sensors_and_diagnostics(self):
+        from custom_components.whatsminer_local.chip_web import ChipWebError
+        readings = [{'slot': 0, 'chips': [{'id': 'C0', 'temperature': 73,
+            'frequency_raw': 480, 'voltage_raw': 275, 'nonce': 1234, 'errors': 3,
+            'crc_errors': 0, 'x': 0, 'x_secondary': 2, 'repeat': 0,
+            'pct': 99.3, 'pct_secondary': 96.6}]}]
+        with patch('custom_components.whatsminer_local.chip_web.ChipWebClient.read_chips', new=AsyncMock(return_value=readings)):
+            entry = await self.add_entry(extra={'web_chips': True})
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            board = next(s for s in self.hass.states.async_all('sensor') if s.attributes.get('source') == 'web')
+            self.assertEqual(dict(board.attributes['chips'][0]), readings[0]['chips'][0])
+            registry = entity_registry.async_get(self.hass)
+            chip_entry = next(e for e in registry.entities.values() if e.unique_id.endswith('web-chip-0-C0'))
+            self.assertIsNotNone(chip_entry.disabled_by)
+            registry.async_update_entity(chip_entry.entity_id, disabled_by=None)
+            await self.hass.config_entries.async_reload(entry.entry_id)
+            await self.hass.async_block_till_done()
+            chip = self.hass.states.get(chip_entry.entity_id)
+            self.assertEqual(chip.attributes['voltage_raw'], 275)
+            self.assertEqual(chip.attributes['crc_errors'], 0)
+            self.assertEqual(chip.attributes['pct_secondary'], 96.6)
+            diagnostics = await async_get_config_entry_diagnostics(self.hass, entry)
+            self.assertEqual(diagnostics['chip_boards'], readings)
+            self.assertNotIn('secret', str(diagnostics))
+            # A valid non-temperature record is still available in the board map.
+            readings[0]['chips'][0] = {'id': 'C0', 'temperature': None, 'errors': 0}
+            coordinator = self.hass.data[DOMAIN][entry.entry_id]
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            self.assertEqual(self.hass.states.get(board.entity_id).state, 'unknown')
+            self.assertEqual(self.hass.states.get(board.entity_id).attributes['chips'][0]['errors'], 0)
+            chip = self.hass.states.get(chip_entry.entity_id)
+            self.assertNotIn('voltage_raw', chip.attributes)
+            self.assertEqual(chip.state, 'unavailable')
+            coordinator.web_client.read_chips = AsyncMock(side_effect=ChipWebError('web_auth_required'))
+            await coordinator.async_refresh()
+            await self.hass.async_block_till_done()
+            self.assertEqual(self.hass.states.get(board.entity_id).state, 'unavailable')
+            self.assertEqual(self.hass.states.get(board.entity_id).attributes.get('chips', []), [])

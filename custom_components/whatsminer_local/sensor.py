@@ -6,6 +6,7 @@ from homeassistant.const import (
 )
 
 from .const import DOMAIN
+from .chip_web import CHIP_METRICS
 from .entity import WhatsminerEntity
 
 # key -> (display name, unit, device class)
@@ -113,6 +114,12 @@ class WhatsminerWebBoardSensor(WhatsminerSensor):
         self.slot = slot
 
     @property
+    def available(self):
+        # Other chip metrics may exist even when every temperature is missing.
+        return self.coordinator.last_update_success and any(
+            b["slot"] == self.slot and b["chips"] for b in self.coordinator.chip_boards)
+
+    @property
     def extra_state_attributes(self):
         chips = next((b["chips"] for b in self.coordinator.chip_boards if b["slot"] == self.slot), [])
         return {"slot": self.slot, "chips": chips, "updated_at": self.coordinator.chip_updated_at,
@@ -126,3 +133,11 @@ class WhatsminerChipSensor(WhatsminerSensor):
     def __init__(self, coordinator, key, slot, chip_id):
         super().__init__(coordinator, key, (
             f"Board {slot} chip {chip_id} web temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE))
+        self.slot, self.chip_id = int(slot), chip_id
+
+    @property
+    def extra_state_attributes(self):
+        chip = next((chip for board in self.coordinator.chip_boards if board["slot"] == self.slot
+                     for chip in board["chips"] if chip["id"] == self.chip_id), {})
+        return {"slot": self.slot, "chip_id": self.chip_id, "source": "web",
+                **{key: chip[key] for key in CHIP_METRICS if key in chip}}

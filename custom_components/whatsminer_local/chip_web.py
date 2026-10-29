@@ -18,6 +18,16 @@ MAX_CHIPS = 4096
 SLOT_HEADER = re.compile(r"^\s*slot\s*:\s*(\d+)\s*(?:,|$)", re.IGNORECASE)
 CHIP_RECORD = re.compile(r"^\s*(C\d+)\b(.*)$")
 RECORD_FIELD = re.compile(r"(?<!\S)([a-z][a-z0-9_-]*)\s*:\s*([^\s,]+)", re.IGNORECASE)
+RECORD_PAIR = re.compile(r"(?<!\S)(x|pct)\s*:\s*([^\s/]+)\s*/\s*([^\s,]+)", re.IGNORECASE)
+# Source voltage/frequency scales and the two pct/x meanings are firmware-specific.
+# Preserve them explicitly instead of inventing electrical units or error rates.
+CHIP_LOG_FIELDS = {
+    "freq": "frequency_raw", "vol": "voltage_raw", "nonce": "nonce",
+    "err": "errors", "crc": "crc_errors", "x": "x", "repeat": "repeat",
+    "pct": "pct",
+}
+CHIP_COUNTERS = frozenset({"nonce", "errors", "crc_errors", "x", "x_secondary", "repeat"})
+CHIP_METRICS = (*CHIP_LOG_FIELDS.values(), "x_secondary", "pct_secondary")
 
 
 class ChipWebError(Exception):
@@ -53,7 +63,7 @@ class _LuCIPage(HTMLParser):
 
 
 def parse_btminer_log(text: str) -> list[dict[str, Any]]:
-    """Read explicit C<n> temp fields within slot blocks; retain source IDs."""
+    """Read explicit C<n> measurements within slot blocks; retain source IDs."""
     boards = []
     current = None
     count = 0
@@ -70,7 +80,7 @@ def parse_btminer_log(text: str) -> list[dict[str, Any]]:
         if not match:
             continue
         fields = {name.lower(): value for name, value in RECORD_FIELD.findall(match[2])}
-        if "freq" not in fields and "temp" not in fields:
+        if not (fields.keys() & {"temp", *CHIP_LOG_FIELDS}):
             continue
         if current is None:
             raise ChipWebError("chip_without_slot")
@@ -80,7 +90,15 @@ def parse_btminer_log(text: str) -> list[dict[str, Any]]:
         value = fields.get("temp")
         if value is not None:
             value = value.removesuffix("°C").removesuffix("C")
-        current["chips"].append({"id": match[1], "temperature": numeric(value)})
+        chip = {"id": match[1], "temperature": numeric(value)}
+        for source, target in CHIP_LOG_FIELDS.items():
+            if source in fields:
+                chip[target] = fields[source].removesuffix("%")
+        for source, first, second in RECORD_PAIR.findall(match[2]):
+            key = CHIP_LOG_FIELDS[source.lower()]
+            chip[key] = first.removesuffix("%")
+            chip[f"{key}_secondary"] = second.removesuffix("%")
+        current["chips"].append(chip)
     # Reuse identity, size and missing-value checks for both wire formats.
     return normalize_chips({"boards": boards})
 
@@ -139,7 +157,7 @@ def json_pointer(payload: Any, pointer: str) -> Any:
 def normalize_chips(payload: Any, pointer: str = "") -> list[dict[str, Any]]:
     """Contract: {boards:[{slot:int, chips:[{id:str, temperature:number|null}]}]}.
 
-    Optional explicit row/column coordinates are carried through, never inferred.
+    Optional numeric CHIP_METRICS and explicit row/column coordinates are retained.
     Missing readings remain null. IDs are required so values cannot be shifted
     onto another chip when a chip disappears from a response.
     """
@@ -177,6 +195,13 @@ def normalize_chips(payload: Any, pointer: str = "") -> list[dict[str, Any]]:
             # A numeric string is fine; an invalid/absent temperature is missing,
             # never treated as zero or synthesized from board statistics.
             item = {"id": chip_id, "temperature": value}
+            for key in CHIP_METRICS:
+                if key not in chip:
+                    continue
+                reading = numeric(chip[key])
+                if reading is not None and (reading < 0 or (key in CHIP_COUNTERS and not reading.is_integer())):
+                    reading = None
+                item[key] = int(reading) if reading is not None and key in CHIP_COUNTERS else reading
             row, column = chip.get("row"), chip.get("column")
             if row is not None or column is not None:
                 if type(row) is not int or type(column) is not int or not 0 <= row < 128 or not 0 <= column < 128:

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Preserve per-chip raw frequency/voltage, nonce/errors/CRC/repeat and both x/pct values from the existing LuCI request or normalized JSON.
+- Show optional metrics in chip sensor attributes, board maps, diagnostics and selected heatmap chip details without creating thousands of additional entities.
+- Retain zero/missing values and preserve other metrics when chip temperature is unavailable. Do not infer voltage units, error rates or firmware-specific x/pct meanings.
+- Explain that Connection settings is the first options step, with API credentials and web authentication on subsequent forms.
+- Add a specific API account/password hint when percentage commands return a password-related rejection, including fast mode. No token algorithm changes or automatic write retries.
+- Pass 60 automated tests (49 Python, 11 JavaScript), including added parser, Home Assistant and card regressions.
+
 ## 0.3.1
 
 - Preserve a bounded, sanitized firmware explanation for rejected API commands instead of showing only the numeric failure code.

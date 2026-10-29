@@ -1,8 +1,22 @@
-/* HA-WhatsMiner 0.3.1 — dependency-free Lovelace card. MIT. */
+/* HA-WhatsMiner 0.4.0 — dependency-free Lovelace card. MIT. */
 export function finiteTemperature(value) {
   if (value === null || value === undefined || typeof value === "boolean" || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+const chipDetailFields = [
+  ["frequency_raw", "Frequency (raw)"], ["voltage_raw", "Voltage (raw)"],
+  ["nonce", "Nonce"], ["errors", "Errors"], ["crc_errors", "CRC errors"],
+  ["x", "x (first)"], ["x_secondary", "x (second)"], ["repeat", "Repeat"],
+  ["pct", "pct (first, %)"], ["pct_secondary", "pct (second, %)"],
+];
+
+export function chipDetails(chip) {
+  return chipDetailFields.filter(([key]) => Object.hasOwn(chip, key)).map(([key, label]) => {
+    const value = finiteTemperature(chip[key]);
+    return `${label}: ${value === null ? "—" : value}`;
+  }).join(" · ");
 }
 
 export function median(values) {
@@ -103,11 +117,11 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       modes.append(button);
     }
     header.append(modes); card.append(header);
-    const details = this._node("div", "details", "Select a chip to view its temperature and deviation from the board median.");
+    const details = this._node("div", "details", "Select a chip to view its temperature, median deviation and available telemetry.");
     for (const id of cfg.entities) {
       const state = this._hass.states[id];
       const board = this._node("section", "board"); card.append(board);
-      if (!state || ["unavailable", "unknown"].includes(state.state) || !Array.isArray(state.attributes.chips)) {
+      if (!state || state.state === "unavailable" || !Array.isArray(state.attributes.chips) || !state.attributes.chips.length) {
         board.append(this._node("div", "message", `${id}: no fresh chip data`)); continue;
       }
       const chips = state.attributes.chips.map(chip => ({ ...chip, id: String(chip.id), temperature: finiteTemperature(chip.temperature) }));
@@ -118,6 +132,9 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       boardHead.append(this._node("div", "boardname", `Board · Slot ${slot ?? "?"}`));
       boardHead.append(this._node("div", "stats", values.length ? `min ${Math.min(...values).toFixed(1)}° · avg ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}° · max ${Math.max(...values).toFixed(1)}° · ${values.length}/${chips.length}` : "No readings"));
       board.append(boardHead);
+      if (chips.some(chip => Object.hasOwn(chip, "voltage_raw") || Object.hasOwn(chip, "frequency_raw"))) {
+        board.append(this._node("div", "note", "Voltage and frequency retain raw firmware values; their units/scales are unverified. Counters are snapshots; pct/x meanings are firmware-specific."));
+      }
       let placement;
       try { placement = layoutCells(chips, cfg.layouts?.[String(slot)], cfg.columns); }
       catch (error) { board.append(this._node("div", "message", error.message)); continue; }
@@ -153,7 +170,8 @@ export class HAWhatsminerHeatmapCard extends HTMLElement {
       cell.style.background = chipColor(value, this._config.min_temperature, this._config.max_temperature, this._mode, reference);
       cell.append(this._node("span", "chipid", chip.id), this._node("span", "temp", tempText));
       const delta = value === null || reference === null ? "—" : `${value - reference >= 0 ? "+" : ""}${(value - reference).toFixed(1)}°C`;
-      cell.title = `Slot ${slot} · ${chip.id} · ${tempText} · Δ ${delta}`;
+      const telemetry = chipDetails(chip);
+      cell.title = `Slot ${slot} · ${chip.id} · ${tempText} · Δ ${delta}${telemetry ? ` · ${telemetry}` : ""}`;
       cell.setAttribute("aria-label", cell.title);
       cell.onclick = () => { details.textContent = cell.title; };
       grid.append(cell);

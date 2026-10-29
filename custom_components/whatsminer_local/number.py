@@ -122,7 +122,12 @@ class WhatsminerPowerPercent(WhatsminerEntity, NumberEntity):
                 self.async_write_ha_state()
                 explanation = f" Miner reported: {err.reason}." if err.reason else ""
                 hint = ""
-                if err.code == -4:
+                if err.reason and "password" in err.reason.lower():
+                    hint = (" Check the password for the selected API account (super or user1-user3)"
+                            " in Configure: submit Connection settings, then edit Power control."
+                            " Web credentials and Basic/LuCI authentication are separate."
+                            " The firmware message does not distinguish malformed JSON from a wrong password.")
+                elif err.code == -4:
                     hint = " Check API Write, the API account and API password; web authentication is separate."
                 elif err.code == -1 and mode == "normal":
                     hint = (" The API returned a generic failure. Normal adjustment requires completed tuning"

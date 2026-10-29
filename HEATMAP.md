@@ -7,7 +7,7 @@ The card requires individual chip readings from the web adapter. API board minim
 The JavaScript is installed with the integration, including HACS installations. After installing and restarting Home Assistant:
 
 1. Open the dashboard resource settings. Depending on HA version, use **Settings → Dashboards → menu ⋮ → Resources**. Advanced Mode in your profile may be needed.
-2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.3.1`**, type **JavaScript module**.
+2. Add **`/ha-whatsminer/ha-whatsminer-heatmap-card.js?v=0.4.0`**, type **JavaScript module**.
 3. Reload the browser. Update the URL version parameter or clear the browser cache after upgrading the card.
 4. Add a manual card using the actual entity IDs of your **Board N web chip map** sensors:
 
@@ -29,10 +29,12 @@ List only boards that actually exist. The integration does not assume three boar
 
 - Every source chip ID and temperature.
 - Board minimum, average, maximum and available reading count.
-- Selected chip details, including deviation from its board median.
+- Selected chip details, including deviation from its board median and available frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values. Hover or select a chip to inspect them; the color scale still represents temperature.
 - A switch between absolute temperature and median deviation. The deviation scale is fixed at −15 to +15°C.
 - Gray hatching for missing measurements.
 - Last successful update time. A source error replaces the old map with an unavailable message.
+
+Raw voltage and frequency units/scales and x/pct meanings are unverified. Counters are snapshots; the card does not calculate error rates. Other telemetry remains selectable when chip temperature is missing.
 
 The card does not infer missing temperatures from neighbors. A statistical temperature deviation alone does not prove a hardware fault.
 

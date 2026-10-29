@@ -1,6 +1,6 @@
 # Individual chip data from the web interface
 
-Version **0.3.1** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
+Version **0.4.0** supports the LuCI `btminerapi` HTML syslog page, the equivalent plain-text log, and normalized JSON. LuCI authentication and session renewal are implemented and tested against a local server. **A supplied device response has been parsed successfully: three boards, 172 chips per board, C0 through C171, with no missing temperature readings.** Live authentication and retrieval on the user's private network remain unverified.
 
 ## Known endpoint
 
@@ -35,11 +35,28 @@ The HTML adapter extracts only **`textarea#syslog`**. Its contents, or a direct 
 
 ```text
 slot: 0, freq: 700, temp: 70, step: 1
-C0 freq:700 vol:1200 temp:91.3 nonce:123 err:0
+C0 freq:700 vol:1200 temp:91.3 nonce:123 err:0 crc:0 x:0 / 2 repeat:0 pct:99.3%/96.6%
 C1 freq:700 vol:1200 temp:92.1 nonce:456 err:0
 ```
 
 Each chip remains attached to its explicit slot. The parser preserves source IDs such as `C0`; it does not shift numbering to `U1`. Board `temp` values are not substituted for chip `temp` values. Missing or invalid chip measurements become missing readings, not zero. Duplicate chip identities or board slots are rejected.
+
+### Additional per-chip fields
+
+The same request collects these optional numeric fields; no additional miner polling is needed:
+
+| Log field | Normalized key | Interpretation |
+| --- | --- | --- |
+| `freq` | `frequency_raw` | Raw firmware frequency value; unit/scale unverified |
+| `vol` | `voltage_raw` | Raw firmware voltage value; unit/scale unverified; no conversion to V/mV |
+| `nonce` | `nonce` | Non-negative integer snapshot |
+| `err` | `errors` | Non-negative integer snapshot |
+| `crc` | `crc_errors` | Non-negative integer snapshot |
+| `x:a / b` | `x`, `x_secondary` | Both non-negative integer values, in source order |
+| `repeat` | `repeat` | Non-negative integer snapshot |
+| `pct:a%/b%` | `pct`, `pct_secondary` | Both displayed percentage values, in source order; values over 100 are preserved |
+
+The firmware-specific meanings of x/pct, reference intervals and counter reset behavior are not inferred. Missing fields are omitted; invalid supplied values become null. Counter negatives/fractions and non-finite/boolean values are invalid. No totals, rates, fault classification or voltage conversions are synthesized. Unknown fields are discarded rather than exposing arbitrary log contents. A chip record can retain other measurements even when its temperature is missing.
 
 The parser accepts whitespace variations and HTML-escaped textarea content. A login page, missing/truncated syslog textarea or unsupported response does not produce false temperatures. Leave **JSON Pointer blank** for HTML or plain text.
 
@@ -82,7 +99,21 @@ For a nested response, configure a JSON Pointer such as `/data` for `{"data":{"b
 After a successful response:
 
 - **Board N web chip map** reports the maximum individual chip temperature. Its `chips` attribute contains IDs and measurements, with `updated_at` and `chip_count` metadata.
-- Individual chip sensors are created disabled by default. Enable selected sensors for history or automations.
+- Individual chip temperature sensors are created disabled by default. Their attributes expose the same optional chip metrics. Enable selected sensors for history or automations; no additional entity is created for every metric of every chip. Use a template sensor for a selected metric when separate metric history is required.
 - **Web chip data status** reports `ok` or a sanitized failure reason.
 
 A web failure invalidates chip entities and maps without dropping valid API telemetry. Chip arrays and update timestamps are excluded from Recorder attributes; enable specific chip sensors for individual history. Historical heatmap playback is not implemented.
+
+Example template for a selected, enabled chip temperature sensor (replace the entity ID):
+
+```yaml
+template:
+  - sensor:
+      - name: "Selected chip errors"
+        availability: >-
+          {{ has_value('sensor.replace_with_chip_temperature') and
+             is_number(state_attr('sensor.replace_with_chip_temperature', 'errors')) }}
+        state: "{{ state_attr('sensor.replace_with_chip_temperature', 'errors') }}"
+```
+
+No `total_increasing` state class is assigned because firmware counter reset semantics have not been verified. This template is unavailable if that chip's temperature sensor is unavailable; the board's `chips` attribute can still retain other valid metrics when temperature is missing. Diagnostics include the normalized chip boards without raw HTML or credentials.

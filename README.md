@@ -1,6 +1,6 @@
 # HA-WhatsMiner
 
-Local Home Assistant / HAOS integration for WhatsMiner. Version **0.3.1**.
+Local Home Assistant / HAOS integration for WhatsMiner. Version **0.4.0**.
 
 Connect directly to the official API 3.x over TCP port 4433. No MQTT, Node-RED or cloud service is required. All project documentation, default entity names, configuration forms, errors and heatmap labels are in **English**.
 
@@ -15,6 +15,7 @@ Power control and API telemetry are implemented. Individual chip temperatures ca
 - Separate measured power, configured power and effective power limit sensors.
 - Explicit power control in watts with user-defined bounds.
 - `set.miner.power_percent` control and a local `normal` / `fast` adjustment-mode selector.
+- Chip frequency/voltage raw values, nonce/error/CRC/repeat snapshots, and both x/pct values in map attributes and chip details.
 - Individual chip readings from the LuCI `btminerapi` syslog page, plain text or normalized JSON.
 - Optional LuCI session login and renewal, HTTP Basic authentication or an existing session cookie.
 - A heatmap card with chip IDs, temperatures, statistics, median deviations and explicit board layouts.
@@ -43,7 +44,7 @@ Existing entity IDs and user-customized names are maintained by Home Assistant. 
 
 Open **Settings → Devices & services → HA-WhatsMiner → Configure** (the options/gear control on the existing integration entry). Do not add a duplicate miner to change credentials.
 
-Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password or cookie field preserves its previous value.
+**The first screen is only Connection settings. Select Submit to continue; it does not finish the options flow when power control or web data is enabled.** Submit the connection form, then edit the API power-control form when enabled, and finally the web form when web chip data is enabled. A blank password or cookie field preserves its previous value.
 
 - The **API password** and account are used for TCP power commands.
 - The **Web username/password** and **Web authentication** are used for chip data. Select **luci** for the supplied LuCI login page; Basic is a different HTTP authentication scheme.
@@ -88,6 +89,8 @@ data:
 
 ### Investigate a rejected power percentage command
 
+If the miner reports **invalid json or password is wrong**, first check the password for the selected **API account** in **Configure → submit Connection settings → Power control**. This firmware message is ambiguous; it does not prove that the password alone is wrong. The request object and SHA256/Base64 token follow the documented API 3.x format and are tested against a reference vector. Changing Basic/LuCI web authentication does not fix TCP authentication. API Write must also be enabled in WhatsminerTool. Setup deliberately does not validate credentials by sending a power command.
+
 API code **-1** is a generic miner failure, not a diagnosis. The integration sends the documented object `{percent, mode}` and does not automatically fall back to another mode or retry the write.
 
 The action error now includes the requested percentage/mode and a sanitized firmware explanation when one is returned. The percentage number entity exposes `last_command`, also included in downloaded diagnostics: requested value, adjustment mode, reported miner work mode, tuning flag, status and API failure code. It contains no configured credentials or authentication token.
@@ -107,6 +110,8 @@ JSON Pointer: leave blank for HTML or text
 ```
 
 The integration reads `C<n>` chip records inside `slot:` blocks from the page's `textarea#syslog`. It preserves the source IDs, including zero-based IDs such as `C0`; it does not rename them to `U1` or infer temperatures from board statistics.
+
+Each map chip also carries the available `frequency_raw`, `voltage_raw`, `nonce`, `errors`, `crc_errors`, `x`, `x_secondary`, `repeat`, `pct` and `pct_secondary` fields. The card shows them when selecting a chip. They are also attributes of individual chip temperature sensors, which remain disabled by default. Voltage and frequency scales/units are unverified for this log, so raw readings are not converted to volts or assigned MHz. The two x/pct values retain source order without assigning undocumented meanings. Counters are snapshots, not calculated rates.
 
 LuCI credentials are separate from API credentials. Certificate verification is enabled by default. For a trusted local miner with a self-signed certificate, you can explicitly disable **Verify HTTPS certificate** in the web options. This affects only that miner's web requests.
 

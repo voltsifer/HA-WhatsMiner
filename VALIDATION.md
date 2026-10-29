@@ -1,8 +1,8 @@
-# HA-WhatsMiner 0.3.1 validation
+# HA-WhatsMiner 0.4.0 validation
 
 Date: October 29, 2026.
 
-**44 Python tests and 9 JavaScript tests pass: 53 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
+**49 Python tests and 11 JavaScript tests pass: 60 automated tests in total.** The English-only source check also passes. Current remote CI results are available on the repository's **Actions** tab.
 
 | Area | Coverage and limits |
 | --- | --- |
@@ -15,7 +15,7 @@ Date: October 29, 2026.
 | HTTPS | Local self-signed TLS server; certificate verification fails by default and succeeds only after explicit opt-out |
 | Session cleanup | Isolated per-miner cookie session is detached on unload without closing Home Assistant's shared connector |
 | Heatmap calculations | Four Node.js tests for values, color scales, mapping and missing data |
-| Heatmap DOM | Five happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
+| Heatmap DOM | Seven happy-dom 21.0.4 tests for rendering, all 172 cells, interaction, unavailable data, HTML injection and explicit layouts |
 | Project language | English labels, documentation and regenerated artwork; CI rejects Cyrillic text and removed language files |
 | Supplied device HTML | Parsed successfully: 3 boards × 172 chips, IDs C0–C171, no missing temperatures; raw private page is not included in the repository |
 | Actual miner operations | Live login, retrieval and power commands remain unverified on the user's private network |
@@ -53,4 +53,6 @@ npm test
 
 The npm dependencies are only for development tests. The production card has no npm, CDN or external JavaScript dependency.
 
-Version 0.3.1 adds tests for preserved and redacted API failure reasons, no write retry, rejected percentage command context in diagnostics, offline credential/authentication editing for an unchanged endpoint, and continued validation of a changed host.
+Version 0.3.1 added tests for preserved and redacted API failure reasons, no write retry, rejected percentage command context in diagnostics, offline credential/authentication editing for an unchanged endpoint, and continued validation of a changed host.
+
+Version 0.4.0 adds optional per-chip metrics, spaced x/pct pair parsing, numeric validation, no cross-chip carryover, chip/map/diagnostics propagation, missing-temperature availability, selected-chip DOM details and the fast-mode password-error hint. The supplied device HTML was rechecked: all 516 chip records include the expected additional fields.
